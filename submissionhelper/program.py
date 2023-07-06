@@ -67,8 +67,8 @@ pet_dict = {
     29 : PetData(PetType.SQUIRREL, np.array([0.2, 0, 0, -0.1, -0.1])),
 }
 
-for id in range(29):
-    pet_dict[id + 1].set_priority(base_priorities[id])
+for pet_id in range(29):
+    pet_dict[pet_id + 1].set_priority(base_priorities[pet_id])
 
 def print_shop(shop_pets : list[ShopPetInfo]):
     print(f"The {len(shop_pets)} pets in the shop are:", flush=True)
@@ -93,9 +93,12 @@ def count_battle_pets(battle_pets : list[PlayerPetInfo]) -> int:
             count += 1
     return count
 
-def find_best_buy(battle_pets : list[PlayerPetInfo], shop_pets : list[ShopPetInfo], shop_foods : list[ShopFoodInfo], pet_dict : dict[int : PetData]) -> tuple[ShopPetInfo, bool]:
-    best_buy = None
+def find_best_buy(battle_pets : list[PlayerPetInfo], shop_pets : list[ShopPetInfo], shop_foods : list[ShopFoodInfo], pet_dict : dict[int : PetData]) -> tuple[int, bool]:
+    best_buy_id = None
     highest_priority = np.NINF
+
+    for pet in shop_pets:
+        print(id(pet), flush=True)
 
     for pet_id in range(1, 30):
         # Currently simplified for only purchasing pets
@@ -106,17 +109,16 @@ def find_best_buy(battle_pets : list[PlayerPetInfo], shop_pets : list[ShopPetInf
                 priority = pet_dict[pet_id].base_priority
                 if priority > highest_priority:
                     highest_priority = priority
-                    best_buy = shop_pets[shop_id]
+                    best_buy_id = shop_id
                 break
 
-    #print(f"Chose {best_buy.type} as best option", flush=True)
-    return best_buy, True
+    return best_buy_id, True
 
 def calculate_value(pet : PlayerPetInfo, pet_dict : dict[int : PetData]) -> float:
     # Currently simplified calculation
     return pet_dict[pet.type.value].base_priority + pet.health / 10 + pet.attack / 10
 
-def find_best_sell(best_buy, is_pet, battle_pets, pet_dict) -> tuple[PlayerPetInfo, int, bool]:
+def find_best_sell(best_buy_id : int, is_pet : bool, shop_pets : list[ShopPetInfo], battle_pets : list[PlayerPetInfo], pet_dict : dict[int : PetData]) -> tuple[PlayerPetInfo, int, bool]:
     # No need to sell if food is bought
     if not is_pet:
         return None, None, False 
@@ -130,7 +132,7 @@ def find_best_sell(best_buy, is_pet, battle_pets, pet_dict) -> tuple[PlayerPetIn
     for pet_id in range(5):
         # If the pet can become an upgrade there is no need to sell
         pet = battle_pets[pet_id]
-        if pet.type == best_buy.type and pet.level < 3:
+        if pet.type == shop_pets[best_buy_id].type and pet.level < 3:
             return None, pet_id, True
         
     # Otherwise, find lowest value pet
@@ -147,18 +149,23 @@ def find_best_sell(best_buy, is_pet, battle_pets, pet_dict) -> tuple[PlayerPetIn
 
     return worst_pet, worst_pet_id, False
 
-def perform_actions(bot_battle : BotBattle, battle_pets : list[PlayerPetInfo], best_buy : PlayerPetInfo, is_pet : bool, target_space : int, best_sell : ShopPetInfo, is_level_up : bool):
+def perform_actions(bot_battle : BotBattle, game_info : GameInfo, best_buy_id : int, is_pet : bool, target_space : int, best_sell : ShopPetInfo, is_level_up : bool):
     if best_sell != None:
         print(f"Selling {best_sell.type} at position {target_space}", flush=True)
         bot_battle.sell_pet(best_sell)
-        # bot_battle.get_game_info()
+        game_info = bot_battle.get_game_info()
     
+        for pet in game_info.player_info.shop_pets:
+            print(id(pet), flush=True)
+
     # Case where a new pet is bought
     if is_pet:
+        best_buy = game_info.player_info.shop_pets[best_buy_id]
+
         # Case where a pet is bought for level up
         if is_level_up:
             print(f"Leveling up {best_buy.type} at position {target_space}", flush=True)
-            bot_battle.level_pet_from_shop(best_buy, battle_pets[target_space])
+            bot_battle.level_pet_from_shop(best_buy, game_info.player_info.pets[target_space])
 
         else:
             print(f"Placing {best_buy.type} at position {target_space}", flush=True)
@@ -262,15 +269,15 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     # Need to add level up from player pets
 
     # Buying and selling process. Upgrading can only occur from the shop currently
-    best_buy, is_pet = find_best_buy(battle_pets, shop_pets, shop_foods, pet_dict)
-    if best_buy == None:
+    best_buy_id, is_pet = find_best_buy(battle_pets, shop_pets, shop_foods, pet_dict)
+    if best_buy_id == None:
         if coins > 0:
             print("Rerolling", flush=True)
             bot_battle.reroll_shop()
             return False
 
-    best_sell, free_space, is_level_up = find_best_sell(best_buy, is_pet, battle_pets, pet_dict)
-    perform_actions(bot_battle, battle_pets, best_buy, is_pet, free_space, best_sell, is_level_up)
+    best_sell, free_space, is_level_up = find_best_sell(best_buy_id, is_pet, shop_pets, battle_pets, pet_dict)
+    perform_actions(bot_battle, game_info, best_buy_id, is_pet, free_space, best_sell, is_level_up)
     game_info = bot_battle.get_game_info()
     battle_pets = game_info.player_info.pets
 
@@ -296,6 +303,7 @@ phase_num = 1
 print("--- Starting battle ---")
 
 while True:
+    print("Getting new game info", flush=True)
     game_info = bot_battle.get_game_info()
 
     # Check if a new round has started
