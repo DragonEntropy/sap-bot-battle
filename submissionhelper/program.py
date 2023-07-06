@@ -99,6 +99,7 @@ def find_best_buy(battle_pets : list[PlayerPetInfo], shop_pets : list[ShopPetInf
 
     for pet_id in range(1, 30):
         # Currently simplified for only purchasing pets
+        shop_id = 0
         for shop_id in range(len(shop_pets)):
             #print(f"Candidate pet id: {pet_dict[pet_id].type}, Shop pet id: {shop_pets[shop_id].type}", flush=True)
             if pet_dict[pet_id].type == shop_pets[shop_id].type:
@@ -262,10 +263,15 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
 
     # Buying and selling process. Upgrading can only occur from the shop currently
     best_buy, shop_id, is_pet = find_best_buy(battle_pets, shop_pets, shop_foods, pet_dict)
+    if best_buy == None:
+        if coins > 0:
+            bot_battle.reroll_shop()
+            return False
+
     best_sell, free_space, is_level_up = find_best_sell(best_buy, is_pet, battle_pets, pet_dict)
     perform_actions(bot_battle, battle_pets, best_buy, is_pet, free_space, best_sell, is_level_up)
-    # game_info = bot_battle.get_game_info()
-    # battle_pets = game_info.player_info.pets
+    game_info = bot_battle.get_game_info()
+    battle_pets = game_info.player_info.pets
 
     # Insert level up process here (if leveling up from board)
 
