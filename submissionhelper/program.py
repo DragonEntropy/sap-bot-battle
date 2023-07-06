@@ -1,13 +1,16 @@
 from submissionhelper.botbattle import BotBattle
 from submissionhelper.info.gameinfo import GameInfo
 from submissionhelper.info.pettype import PetType
+from submissionhelper.info.playerpetinfo import PlayerPetInfo
+from submissionhelper.info.shoppetinfo import ShopPetInfo
+from submissionhelper.info.shopfoodinfo import ShopFoodInfo
 
 import numpy as np
 
 class PetData:
     base_priority = 0
 
-    def __init__(self, type, placement_priorities):
+    def __init__(self, type : PetType, placement_priorities: np.ndarray):
         self.type = type
         self.placement_priorities = placement_priorities
 
@@ -67,8 +70,14 @@ pet_dict = {
 for id in range(29):
     pet_dict[id + 1].set_priority(base_priorities[id])
 
+def count_battle_pets(battle_pets : list[PlayerPetInfo]) -> int:
+    count = 0
+    for pet in battle_pets:
+        if pet != None:
+            count += 1
+    return count
 
-def find_best_buy(battle_pets, shop_pets, shop_foods, pet_dict):
+def find_best_buy(battle_pets : list[PlayerPetInfo], shop_pets : list[ShopPetInfo], shop_foods : list[ShopFoodInfo], pet_dict : dict[int : PetData]) -> tuple[ShopPetInfo, int, bool]:
     best_buy = None
     highest_priority = -np.infty
 
@@ -84,42 +93,53 @@ def find_best_buy(battle_pets, shop_pets, shop_foods, pet_dict):
 
     return best_buy, shop_id, True
 
-def calculate_value(pet, pet_dict):
+def calculate_value(pet : PlayerPetInfo, pet_dict : dict[int : PetData]) -> float:
     # Currently simplified calculation
     return pet_dict[pet.type].base_priority + pet.health / 10 + pet.attack / 10
 
-def find_best_sell(best_buy, is_pet, battle_pets, pet_dict):
+def find_best_sell(best_buy, is_pet, battle_pets, pet_dict) -> tuple[PlayerPetInfo, int, bool]:
     # No need to sell if food is bought
     if not is_pet:
-        return None
+        return None, None, False
     
-    for pet in battle_pets:
+        
+    for pet_id in range(5):
+        pet = battle_pets[pet_id]
+        
         # If battle pets are not full there is no need to sell
         if pet == None:
-            return None
-        
+            return None, pet_id, False
+    
         # If the pet can become an upgrade there is no need to sell
         if pet.type == best_buy.type and pet.level < 3:
-            return None
+            return None, pet_id, True
         
     # Otherwise, find lowest value pet
     worst_pet = None
+    worst_pet_id = None
     lowest_value = np.infty
-    for pet in battle_pets:
+    for pet_id in range(5):
+        pet = battle_pets[pet_id]
         value = calculate_value(pet, pet_dict)
         if value < lowest_value:
             lowest_value = value
             worst_pet = pet
+            worst_pet_id = pet_id
 
-    return worst_pet
+    return worst_pet, worst_pet_id, False
 
-def perform_actions(bot_battle, best_buy, shop_id, is_pet, best_sell):
+def perform_actions(bot_battle : BotBattle, battle_pets : list[PlayerPetInfo], best_buy : PlayerPetInfo, is_pet : bool, target_space : int, best_sell : ShopPetInfo, is_level_up : bool):
     if best_sell != None:
         bot_battle.sell_pet(best_sell)
 
-    # Case where pet is bought
+    # Case where a new pet is bought
     if is_pet:
-        bot_battle.buy_pet(best_buy, shop_id)
+        # Case where a pet is bought for level up
+        if is_level_up:
+            bot_battle.level_pet_from_shop(best_buy, battle_pets[target_space])
+
+        else:
+            bot_battle.buy_pet(best_buy, target_space)
 
     # Case where food is bought
     else:
@@ -127,7 +147,7 @@ def perform_actions(bot_battle, best_buy, shop_id, is_pet, best_sell):
         
     
 
-def recursive_placement(positions, depth, placement):
+def recursive_placement(positions : list[int], depth : int, placement : list[int]) -> list[int]:
     if depth == 1:
         placement[0] = positions[0]
         yield placement
@@ -138,7 +158,7 @@ def recursive_placement(positions, depth, placement):
             recursive_placement(positions, depth - 1, placement)
             positions.insert(i, pet)
 
-def calculate_placement(battle_pets, pet_dict):
+def calculate_placement(battle_pets : list[PlayerPetInfo], pet_dict : dict[int : PetData]) -> list[int]:
     best_placement = None
     best_score = -np.infty
     positions = [0, 1, 2, 3, 4]
@@ -152,7 +172,7 @@ def calculate_placement(battle_pets, pet_dict):
 
     return best_placement
 
-def perform_placement(bot_battle, battle_pets, placement):
+def perform_placement(bot_battle : BotBattle, battle_pets : list[PlayerPetInfo], placement : list[int]):
     for i in range(4):
         if placement[i] != i:
             bot_battle.swap_pets(i, placement[i])
@@ -161,7 +181,7 @@ def perform_placement(bot_battle, battle_pets, placement):
 
 
 
-def make_move(bot_battle, game_info, pet_dict):
+def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int : PetData]):
     health = game_info.player_info.health           # int
     coins = game_info.player_info.coins             # int
     battle_pets = game_info.player_info.pets        # List[PlayerPetInfo]
@@ -197,8 +217,8 @@ def make_move(bot_battle, game_info, pet_dict):
 
     # Insert buying and selling process here
     best_buy, shop_id, is_pet = find_best_buy(battle_pets, shop_pets, shop_foods)
-    best_sell = find_best_sell(best_buy, is_pet, battle_pets, pet_dict)
-    perform_actions(bot_battle, best_buy, shop_id, is_pet, best_sell)
+    best_sell, free_space, is_level_up = find_best_sell(best_buy, is_pet, battle_pets, pet_dict)
+    perform_actions(bot_battle, battle_pets, best_buy, is_pet, free_space, best_sell, is_level_up)
 
     # Insert level up process here (if leveling up from board)
 
