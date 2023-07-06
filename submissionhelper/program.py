@@ -15,7 +15,7 @@ class PetData:
         self.placement_priorities = placement_priorities
 
     @staticmethod
-    def get_placement_score(pet, index):
+    def get_placement_score(pet, index : int):
         if pet:
             return pet.placement_priorities[index]
         else:
@@ -79,29 +79,30 @@ def count_battle_pets(battle_pets : list[PlayerPetInfo]) -> int:
 
 def find_best_buy(battle_pets : list[PlayerPetInfo], shop_pets : list[ShopPetInfo], shop_foods : list[ShopFoodInfo], pet_dict : dict[int : PetData]) -> tuple[ShopPetInfo, int, bool]:
     best_buy = None
-    highest_priority = -np.infty
+    highest_priority = np.NINF
 
     for pet_id in range(1, 30):
         # Currently simplified for only purchasing pets
         for shop_id in range(len(shop_pets)):
-            if pet_dict[pet_id] == shop_pets[shop_id]:
+            #print(f"Candidate pet id: {pet_dict[pet_id].type}, Shop pet id: {shop_pets[shop_id].type}")
+            if pet_dict[pet_id].type == shop_pets[shop_id].type:
                 priority = pet_dict[pet_id].base_priority
                 if priority > highest_priority:
                     highest_priority = priority
                     best_buy = shop_pets[shop_id]
                 break
 
+    print(f"Chose {best_buy} as best option")
     return best_buy, shop_id, True
 
 def calculate_value(pet : PlayerPetInfo, pet_dict : dict[int : PetData]) -> float:
     # Currently simplified calculation
-    return pet_dict[pet.type].base_priority + pet.health / 10 + pet.attack / 10
+    return pet_dict[pet.type.value].base_priority + pet.health / 10 + pet.attack / 10
 
 def find_best_sell(best_buy, is_pet, battle_pets, pet_dict) -> tuple[PlayerPetInfo, int, bool]:
     # No need to sell if food is bought
     if not is_pet:
-        return None, None, False
-    
+        return None, None, False 
         
     for pet_id in range(5):
         # If battle pets are not full there is no need to sell
@@ -118,7 +119,7 @@ def find_best_sell(best_buy, is_pet, battle_pets, pet_dict) -> tuple[PlayerPetIn
     # Otherwise, find lowest value pet
     worst_pet = None
     worst_pet_id = None
-    lowest_value = np.infty
+    lowest_value = np.Inf
     for pet_id in range(5):
         pet = battle_pets[pet_id]
         value = calculate_value(pet, pet_dict)
@@ -149,27 +150,36 @@ def perform_actions(bot_battle : BotBattle, battle_pets : list[PlayerPetInfo], b
     
 
 def recursive_placement(positions : list[int], depth : int, placement : list[int]) -> list[int]:
+    #print(f"placement: {placement}, depth: {depth}, positions: {positions}")
     if depth == 1:
         placement[0] = positions[0]
         yield placement
     else:
         for i in range(depth):
-            pet = positions.pop(i)
-            placement[depth - 1] = pet
-            recursive_placement(positions, depth - 1, placement)
-            positions.insert(i, pet)
+            pet_id = positions.pop(i)
+            placement[depth - 1] = pet_id
+            yield from recursive_placement(positions, depth - 1, placement)
+            positions.insert(i, pet_id)
 
 def calculate_placement(battle_pets : list[PlayerPetInfo], pet_dict : dict[int : PetData]) -> list[int]:
     best_placement = None
-    best_score = -np.infty
+    best_score = np.NINF
     positions = [0, 1, 2, 3, 4]
-    current_placement = []
+    current_placement = [-1, -1, -1, -1, -1]
 
     for placement in recursive_placement(positions, 5, current_placement):
-        score = sum(PetData.get_placement_score(pet_dict[battle_pets[placement[i]]], i) for i in range(5))
+        score = 0
+        for pet_id in range(5):
+            if battle_pets[placement[pet_id]] != None:
+                # print(f"Finding best score for {battle_pets[placement[pet_id]].type} at position {pet_id}")
+                score += PetData.get_placement_score(pet_dict[battle_pets[placement[pet_id]].type.value], pet_id)
+
+        #print(f"Current score: {score}; Best score: {best_score}")
         if score > best_score:
             best_score = score
             best_placement = placement
+
+    print(f"Chose {best_placement} as best placement")
 
     return best_placement
 
@@ -177,7 +187,7 @@ def perform_placement(bot_battle : BotBattle, battle_pets : list[PlayerPetInfo],
     for i in range(4):
         if placement[i] != i:
             bot_battle.swap_pets(i, placement[i])
-            swap_index = placement.index[i]
+            swap_index = placement.index(i)
             placement[i], placement[swap_index] = placement[swap_index], placement[i]
 
 
@@ -189,6 +199,7 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     shop_pets = game_info.player_info.shop_pets     # List[ShopPetInfo]
     shop_foods = game_info.player_info.shop_foods   # List[ShopFoodInfo]
 
+    # Turn ends if not enough coins
     if coins < 3:
         return True
 
@@ -228,7 +239,7 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     # Need to add level up from player pets
 
     # Buying and selling process. Upgrading can only occur from the shop currently
-    best_buy, shop_id, is_pet = find_best_buy(battle_pets, shop_pets, shop_foods)
+    best_buy, shop_id, is_pet = find_best_buy(battle_pets, shop_pets, shop_foods, pet_dict)
     best_sell, free_space, is_level_up = find_best_sell(best_buy, is_pet, battle_pets, pet_dict)
     perform_actions(bot_battle, battle_pets, best_buy, is_pet, free_space, best_sell, is_level_up)
 
@@ -241,7 +252,7 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     placement = calculate_placement(battle_pets, pet_dict)
     perform_placement(bot_battle, battle_pets, placement)
 
-    # End turn if no enough coins to buy a new pet
+    # Turn continues
     return False
 
 
@@ -249,13 +260,20 @@ bot_battle = BotBattle()
 
 round_number = True
 object_ids = []
+prev_round_num = 0
+phase_num = 1
+
 while True:
     game_info = bot_battle.get_game_info()
 
     # Check if a new round has started
     if prev_round_num != game_info.round_num:
         prev_round_num = game_info.round_num
-        print(f"Round {prev_round_num}\n\n")
+        phase_num = 1
+    
+    print(f"Round {prev_round_num} Phase {phase_num}\n\n")
 
     if make_move(bot_battle, game_info, pet_dict):
         bot_battle.end_turn()
+
+    phase_num += 1
