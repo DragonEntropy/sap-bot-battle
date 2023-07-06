@@ -104,13 +104,14 @@ def find_best_sell(best_buy, is_pet, battle_pets, pet_dict) -> tuple[PlayerPetIn
     
         
     for pet_id in range(5):
-        pet = battle_pets[pet_id]
-        
         # If battle pets are not full there is no need to sell
+        pet = battle_pets[pet_id]
         if pet == None:
             return None, pet_id, False
     
+    for pet_id in range(5):
         # If the pet can become an upgrade there is no need to sell
+        pet = battle_pets[pet_id]
         if pet.type == best_buy.type and pet.level < 3:
             return None, pet_id, True
         
@@ -181,12 +182,15 @@ def perform_placement(bot_battle : BotBattle, battle_pets : list[PlayerPetInfo],
 
 
 
-def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int : PetData]):
+def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int : PetData]) -> bool:
     health = game_info.player_info.health           # int
     coins = game_info.player_info.coins             # int
     battle_pets = game_info.player_info.pets        # List[PlayerPetInfo]
     shop_pets = game_info.player_info.shop_pets     # List[ShopPetInfo]
     shop_foods = game_info.player_info.shop_foods   # List[ShopFoodInfo]
+
+    if coins < 3:
+        return True
 
     """
     Choices of action are:
@@ -204,18 +208,26 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
         end_turn
 
     Move flow:
-        Check the highest "priority" item in both shops
-            If it can be bought and there is empty pet space or can level a pet, purchase
-            If it can be bought but there is no space, sell lowest "value" pet
-            If it can not be bought, freeze the "n" highest priority items
-            If all priorities are below reroll, perform reroll (reroll priority is lowest when coins is a multiple of 3)
+        1. Check the highest "priority" item in both shops
+            a. If it can be bought, mark it for purchase
+            b. If it can not be bought, freeze the "n" highest priority items
+            c. If a pet was bought but there was no space, sell lowest "value" pet
+            d. If all non-frozen priorities are below reroll, perform reroll (reroll priority is lowest when coins is a multiple of 3)
 
-        When placing a new pet:
-            Pick assortment with greatest sum of values
+        2. When placing a new pet:
+            Calculate total value of all 120 assortments
+            Pick highest value assortment and swap pairs
                     
+        3. If coins is zero and all "n" high priority items are frozen, end turn
     """
 
-    # Insert buying and selling process here
+    # Need to support freezing
+    # Need to add reroll
+    # Need to account for money aside from end turn 
+    # Need to implement buying and using food
+    # Need to add level up from player pets
+
+    # Buying and selling process. Upgrading can only occur from the shop currently
     best_buy, shop_id, is_pet = find_best_buy(battle_pets, shop_pets, shop_foods)
     best_sell, free_space, is_level_up = find_best_sell(best_buy, is_pet, battle_pets, pet_dict)
     perform_actions(bot_battle, battle_pets, best_buy, is_pet, free_space, best_sell, is_level_up)
@@ -229,7 +241,8 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     placement = calculate_placement(battle_pets, pet_dict)
     perform_placement(bot_battle, battle_pets, placement)
 
-
+    # End turn if no enough coins to buy a new pet
+    return False
 
 
 bot_battle = BotBattle()
@@ -244,4 +257,5 @@ while True:
         prev_round_num = game_info.round_num
         print(f"Round {prev_round_num}\n\n")
 
-    make_move(bot_battle, game_info, pet_dict)
+    if make_move(bot_battle, game_info, pet_dict):
+        bot_battle.end_turn()
