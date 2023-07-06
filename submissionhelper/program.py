@@ -71,7 +71,7 @@ for id in range(29):
     pet_dict[id + 1].set_priority(base_priorities[id])
 
 def print_shop(shop_pets : list[ShopPetInfo]):
-    print(f"The {len(shop_pets)} pets in the shop are", flush=True)
+    print(f"The {len(shop_pets)} pets in the shop are:", flush=True)
     for pet in shop_pets:
         print(f"\t{pet.type}", flush=True)
         
@@ -93,7 +93,7 @@ def count_battle_pets(battle_pets : list[PlayerPetInfo]) -> int:
             count += 1
     return count
 
-def find_best_buy(battle_pets : list[PlayerPetInfo], shop_pets : list[ShopPetInfo], shop_foods : list[ShopFoodInfo], pet_dict : dict[int : PetData]) -> tuple[ShopPetInfo, int, bool]:
+def find_best_buy(battle_pets : list[PlayerPetInfo], shop_pets : list[ShopPetInfo], shop_foods : list[ShopFoodInfo], pet_dict : dict[int : PetData]) -> tuple[ShopPetInfo, bool]:
     best_buy = None
     highest_priority = np.NINF
 
@@ -110,7 +110,7 @@ def find_best_buy(battle_pets : list[PlayerPetInfo], shop_pets : list[ShopPetInf
                 break
 
     #print(f"Chose {best_buy.type} as best option", flush=True)
-    return best_buy, shop_id, True
+    return best_buy, True
 
 def calculate_value(pet : PlayerPetInfo, pet_dict : dict[int : PetData]) -> float:
     # Currently simplified calculation
@@ -193,7 +193,7 @@ def calculate_placement(battle_pets : list[PlayerPetInfo], pet_dict : dict[int :
         for pet_id in range(5):
             if battle_pets[placement[pet_id]] != None:
                 score += PetData.get_placement_score(pet_dict[battle_pets[placement[pet_id]].type.value], pet_id)
-        print(f"Score for placement {placement} is {score}", flush=True)
+        #print(f"Score for placement {placement} is {score}", flush=True)
 
         #print(f"Current score: {score}; Best score: {best_score}", flush=True)
         if score > best_score:
@@ -262,9 +262,10 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     # Need to add level up from player pets
 
     # Buying and selling process. Upgrading can only occur from the shop currently
-    best_buy, shop_id, is_pet = find_best_buy(battle_pets, shop_pets, shop_foods, pet_dict)
+    best_buy, is_pet = find_best_buy(battle_pets, shop_pets, shop_foods, pet_dict)
     if best_buy == None:
         if coins > 0:
+            print("Rerolling", flush=True)
             bot_battle.reroll_shop()
             return False
 
@@ -306,6 +307,7 @@ while True:
     print(f"Coins: {game_info.player_info.coins}", flush=True)
 
     if make_move(bot_battle, game_info, pet_dict):
+        print("Ending turn", flush=True)
         bot_battle.end_turn()
 
     phase_num += 1
