@@ -9,6 +9,7 @@ import numpy as np
 
 class PetData:
     base_priority = 0
+    count = 0
 
     def __init__(self, type : PetType, placement_priorities: np.ndarray):
         self.type = type
@@ -149,14 +150,12 @@ def find_best_sell(best_buy_id : int, is_pet : bool, shop_pets : list[ShopPetInf
 
     return worst_pet, worst_pet_id, False
 
-def perform_actions(bot_battle : BotBattle, game_info : GameInfo, best_buy_id : int, is_pet : bool, target_space : int, best_sell : ShopPetInfo, is_level_up : bool):
+def perform_actions(bot_battle : BotBattle, game_info : GameInfo, best_buy_id : int, is_pet : bool, target_space : int, best_sell : ShopPetInfo, is_level_up : bool, pet_dict : dict[int : PetData]):
     if best_sell != None:
         print(f"Selling {best_sell.type} at position {target_space}", flush=True)
+        pet_dict[best_sell.type.value].count -= 1
         bot_battle.sell_pet(best_sell)
         game_info = bot_battle.get_game_info()
-    
-        for pet in game_info.player_info.shop_pets:
-            print(id(pet), flush=True)
 
     # Case where a new pet is bought
     if is_pet:
@@ -169,6 +168,7 @@ def perform_actions(bot_battle : BotBattle, game_info : GameInfo, best_buy_id : 
 
         else:
             print(f"Placing {best_buy.type} at position {target_space}", flush=True)
+            pet_dict[best_buy.type.value].count += 1
             bot_battle.buy_pet(best_buy, target_space)
 
     # Case where food is bought
@@ -277,7 +277,7 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
             return False
 
     best_sell, free_space, is_level_up = find_best_sell(best_buy_id, is_pet, shop_pets, battle_pets, pet_dict)
-    perform_actions(bot_battle, game_info, best_buy_id, is_pet, free_space, best_sell, is_level_up)
+    perform_actions(bot_battle, game_info, best_buy_id, is_pet, free_space, best_sell, is_level_up, pet_dict)
     game_info = bot_battle.get_game_info()
     battle_pets = game_info.player_info.pets
 
