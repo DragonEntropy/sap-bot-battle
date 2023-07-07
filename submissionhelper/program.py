@@ -18,7 +18,7 @@ class PetData:
 
     # Returns the score of placing the unit a specific index
     @staticmethod
-    def get_placement_score(pet, index : int):
+    def get_placement_score(pet, index : int) -> float:
         if pet:
             return pet.placement_priorities[index]
         else:
@@ -105,6 +105,15 @@ def count_battle_pets(battle_pets : list[PlayerPetInfo]) -> int:
             count += 1
     return count
 
+# Calculate total sublevels of a pet    
+def get_total_sublevels(pet : PlayerPetInfo) -> int:
+    total = pet.sub_level
+    if pet.level == 2:
+        total += 2
+    elif pet.level == 3:
+        total += 5
+    return total
+
 # Returns the best item to buy, and whether or not it's a pet
 # Returns none as best item if it will not buy
     # Needs to be able to buy food
@@ -132,25 +141,39 @@ def find_best_buy(battle_pets : list[PlayerPetInfo], shop_pets : list[ShopPetInf
 def calculate_value(pet : PlayerPetInfo, pet_dict : dict[int : PetData]) -> float:
     return pet_dict[pet.type.value].base_priority + pet.health / 10 + pet.attack / 10
 
-# Returns the best player pet to sell, its index on the board and if an upgrade should be done from the shop
+# Returns the best player pet to sell, its index on the board, if an upgrade should be done and another index if upgrading from the board
 # Returns none as best pet to sell if the board is not full or an evolution can take place
+# Returns an index as other_space only if two pets are being evolved on the board
     # Needs to account for two of the same pets existing on the board, leveling into each other
-def find_best_sell(best_buy_id : int, is_pet : bool, shop_pets : list[ShopPetInfo], battle_pets : list[PlayerPetInfo], pet_dict : dict[int : PetData]) -> tuple[PlayerPetInfo, int, bool]:
+def find_best_sell(best_buy_id : int, is_pet : bool, shop_pets : list[ShopPetInfo], battle_pets : list[PlayerPetInfo], pet_dict : dict[int : PetData]) -> tuple[PlayerPetInfo, int, bool, int]:
     # No need to sell if food is bought
     if not is_pet:
-        return None, None, False 
+        return None, None, False, None
         
     for pet_id in range(5):
         # If battle pets are not full there is no need to sell
         pet = battle_pets[pet_id]
         if pet == None:
-            return None, pet_id, False
+            return None, pet_id, False, None
     
     for pet_id in range(5):
         # If the pet can become an upgrade there is no need to sell
         pet = battle_pets[pet_id]
         if pet.type == shop_pets[best_buy_id].type and pet.level < 3:
-            return None, pet_id, True
+            return None, pet_id, True, None
+        
+    for pet_id_a in range(1, 5):
+        # If two existing pets can become upgrades of each other there is no need to sell
+        pet_a = battle_pets[pet_id_a]
+        for pet_id_b in range(pet_id_a):
+            pet_b = battle_pets[pet_id_b]
+
+            if pet_a.type == pet_b.type:
+                if pet_a.level != 3 and pet_b.level != 3:
+                    if get_total_sublevels(pet_a) > get_total_sublevels(pet_b):    
+                        return None, pet_id_b, True, pet_id_a
+                    else:
+                        return None, pet_id_a, True, pet_id_b   
         
     # Otherwise, find lowest value pet
     worst_pet = None
@@ -164,11 +187,11 @@ def find_best_sell(best_buy_id : int, is_pet : bool, shop_pets : list[ShopPetInf
             worst_pet = pet
             worst_pet_id = pet_id
 
-    return worst_pet, worst_pet_id, False
+    return worst_pet, worst_pet_id, False, None
 
 # Performs the buy and sell operations
     # Needs to incorporate food
-def perform_actions(bot_battle : BotBattle, game_info : GameInfo, best_buy_id : int, is_pet : bool, target_space : int, best_sell : ShopPetInfo, is_level_up : bool, pet_dict : dict[int : PetData]):
+def perform_actions(bot_battle : BotBattle, game_info : GameInfo, best_buy_id : int, is_pet : bool, target_space : int, other_space : int, best_sell : ShopPetInfo, is_level_up : bool, pet_dict : dict[int : PetData]):
     # If there is something to sell, it sells it and refreshes game_info
     if best_sell != None:
         print(f"Selling {best_sell.type} at position {target_space}", flush=True)
@@ -180,13 +203,24 @@ def perform_actions(bot_battle : BotBattle, game_info : GameInfo, best_buy_id : 
     if is_pet:
         best_buy = game_info.player_info.shop_pets[best_buy_id]
 
-        # Case where a pet is bought for level up
+        # Case where a level up will occur
         if is_level_up:
-            print(f"Leveling up {best_buy.type} at position {target_space}", flush=True)
-            bot_battle.level_pet_from_shop(best_buy, game_info.player_info.pets[target_space])
 
-        # Case where the pet is placed on the board normally
-        else:
+            # Case where shop pet is used as a level up
+            if other_space == None:
+                print(f"Leveling up {best_buy.type} at position {target_space}", flush=True)
+                bot_battle.level_pet_from_shop(best_buy, game_info.player_info.pets[target_space])
+
+            # Case where existing pets are combined
+            else:
+                battle_pets = game_info.player_info.pets
+                print(f"Leveling up {battle_pets[other_space]} at position {other_space} from position {target_space}", flush=True)
+                bot_battle.level_pet_from_pets(battle_pets[target_space], battle_pets[other_space])
+                game_info = bot_battle.get_game_info()
+                best_buy = game_info.player_info.shop_pets[best_buy_id]
+
+        # Case where the pet is placed on the board normally (including after level up from board)
+        if not is_level_up or other_space != None:
             print(f"Placing {best_buy.type} at position {target_space}", flush=True)
             pet_dict[best_buy.type.value].count += 1
             bot_battle.buy_pet(best_buy, target_space)
@@ -306,14 +340,12 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
             bot_battle.reroll_shop()
             return False
 
-    best_sell, free_space, is_level_up = find_best_sell(best_buy_id, is_pet, shop_pets, battle_pets, pet_dict)
-    perform_actions(bot_battle, game_info, best_buy_id, is_pet, free_space, best_sell, is_level_up, pet_dict)
+    best_sell, free_space, is_level_up, other_space = find_best_sell(best_buy_id, is_pet, shop_pets, battle_pets, pet_dict)
+    perform_actions(bot_battle, game_info, best_buy_id, is_pet, free_space, other_space, best_sell, is_level_up, pet_dict)
 
     # Must refresh game_info after buying
     game_info = bot_battle.get_game_info()
     battle_pets = game_info.player_info.pets
-
-    # Insert level up process here (if leveling up from board)
 
     # Finding and performing the ideal placement
     #   No dynamic calculation currently:
