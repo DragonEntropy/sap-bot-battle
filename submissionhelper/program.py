@@ -113,10 +113,13 @@ for food_id in range(8):
 
 # Prints the shop's pets
 #   Needs to print shop food
-def print_shop(shop_pets : list[ShopPetInfo]):
+def print_shop(shop_pets : list[ShopPetInfo], shop_foods : list[ShopFoodInfo]):
     print(f"The {len(shop_pets)} pets in the shop are:", flush=True)
     for pet in shop_pets:
         print(f"\t{pet.type}", flush=True)
+    print(f"The {len(shop_foods)} food items in the shop are:", flush=True)
+    for food in shop_foods:
+        print(f"\t{food.type}", flush=True)
 
 # Prints the board's pets
 #   Needs to print pet level, sublevel, attack, health and effects        
@@ -382,7 +385,7 @@ def perform_placement(bot_battle : BotBattle, placement : list[int]):
 def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int : PetData], food_dict : dict[int : FoodData]) -> bool:
     health, coins, battle_pets, shop_pets, shop_foods = game_info_summary(game_info)
 
-    print_shop(shop_pets)
+    print_shop(shop_pets, shop_foods)
     print_board(battle_pets)
 
     # Turn ends if there is not enough coins
