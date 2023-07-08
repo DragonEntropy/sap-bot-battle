@@ -170,15 +170,9 @@ def get_total_sublevels(pet : PlayerPetInfo) -> int:
 # Returns the best item to buy, and whether or not it's a pet
 # Returns none as best item if it will not buy
     # Needs to be able to buy food
-def find_best_pet(shop_pets : list[ShopPetInfo], pet_dict : dict[int : PetData]) -> tuple[int, float]:
+def find_best_pet(shop_pets : list[ShopPetInfo], battle_pets : list[PlayerPetInfo], pet_dict : dict[int : PetData]) -> tuple[int, float]:
     best_buy_id = None
     highest_priority = np.NINF
-
-    """
-    pet_priority_offset = 0
-    if battle_pets_num == 5:
-        pet_priority_offset = -3
-    """
 
     # Finds the value of each pet
     for pet_id in range(1, 30):
@@ -186,8 +180,13 @@ def find_best_pet(shop_pets : list[ShopPetInfo], pet_dict : dict[int : PetData])
 
         # If a pet is in the shop and has the currently highest value, it becomes the best item to buy
         for pet_shop_id in range(len(shop_pets)):
-            if pet_dict[pet_id].type == shop_pets[pet_shop_id].type:
+            shop_pet = shop_pets[pet_shop_id]
+            if pet_dict[pet_id].type == shop_pet.type:
                 priority = pet_dict[pet_id].base_priority
+                for battle_pet in battle_pets:
+                    if battle_pet != None:
+                        if battle_pet.type == shop_pet.type and battle_pet.level < 3:
+                            priority += 10
                 if priority > highest_priority:
                     highest_priority = priority
                     best_buy_id = pet_shop_id
@@ -411,7 +410,7 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     # Need to add reroll
     # Need to account for money aside from end turn 
 
-    best_pet_id, pet_value = find_best_pet(shop_pets, pet_dict)
+    best_pet_id, pet_value = find_best_pet(shop_pets, battle_pets, pet_dict)
     best_food_id, food_value = find_best_food(battle_pets, shop_foods, food_dict)
     if best_pet_id == None and best_food_id == None:
         if coins > 0:
