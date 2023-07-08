@@ -8,13 +8,6 @@ from submissionhelper.info.shopfoodinfo import ShopFoodInfo
 
 import numpy as np
 
-"""
-# Improved buy/sell flow:
-    # Find best pet and food, including their values
-    # Find best sell, and determine if best pet is still best when selling
-    # Proceed
-"""
-
 # A helper class for storing data of each pet type
 class PetData:
     base_priority = 0
@@ -170,9 +163,14 @@ def get_total_sublevels(pet : PlayerPetInfo) -> int:
 # Returns the best item to buy, and whether or not it's a pet
 # Returns none as best item if it will not buy
     # Needs to be able to buy food
-def find_best_pet(shop_pets : list[ShopPetInfo], pet_dict : dict[int : PetData]) -> tuple[int, float]:
+def find_best_buy(battle_pets : list[PlayerPetInfo], shop_pets : list[ShopPetInfo], shop_foods : list[ShopFoodInfo], pet_dict : dict[int : PetData], food_dict : dict[int : FoodData]) -> tuple[int, bool]:
     best_buy_id = None
     highest_priority = np.NINF
+    is_pet = True
+
+    
+    buffed_pets_num = count_buffed_pets(battle_pets)
+    battle_pets_num = count_battle_pets(battle_pets)
 
     """
     pet_priority_offset = 0
@@ -193,16 +191,10 @@ def find_best_pet(shop_pets : list[ShopPetInfo], pet_dict : dict[int : PetData])
                     best_buy_id = pet_shop_id
                 break
 
-    return best_buy_id, highest_priority
 
-def find_best_food(battle_pets : list[PlayerPetInfo], shop_foods : list[ShopFoodInfo], food_dict : dict[int : FoodData]) -> tuple[int, float]:
-    
-    buffed_pets_num = count_buffed_pets(battle_pets)
-    highest_priority = np.NINF
-    best_buy_id = None
-    
     # Finds the value of each food
     for food_id in range(1, 9):
+        food_shop_id = 0
 
         # If a food is in the shop and has the currently highest value, it becomes the best item to buy
         for food_shop_id in range(len(shop_foods)):
@@ -210,12 +202,14 @@ def find_best_food(battle_pets : list[PlayerPetInfo], shop_foods : list[ShopFood
                 continue
             if food_dict[food_id].type == shop_foods[food_shop_id].type:
                 priority = food_dict[food_id].base_priority
+                priority += 4 * (battle_pets_num - 4)
                 if priority > highest_priority:
                     highest_priority = priority
                     best_buy_id = food_shop_id
+                    is_pet = False
                 break
 
-    return best_buy_id, highest_priority
+    return best_buy_id, is_pet
 
 # Returns the value of a pet to determine what is best to sell
     # Currently grossly simplified, should be unique lambda function for each pet?
@@ -226,19 +220,22 @@ def calculate_value(pet : PlayerPetInfo, pet_dict : dict[int : PetData]) -> floa
 # Returns none as best pet to sell if the board is not full or an evolution can take place
 # Returns an index as other_space only if two pets are being evolved on the board
     # Needs to account for two of the same pets existing on the board, leveling into each other
-def find_best_pet_move(best_buy_id : int, shop_pets : list[ShopPetInfo], battle_pets : list[PlayerPetInfo], pet_dict : dict[int : PetData]) -> tuple[str, int, int, float]:
-    
+def find_best_sell(best_buy_id : int, is_pet : bool, shop_pets : list[ShopPetInfo], battle_pets : list[PlayerPetInfo], pet_dict : dict[int : PetData]) -> tuple[PlayerPetInfo, int, bool, int]:
+    # No need to sell if food is bought
+    if not is_pet:
+        return None, None, False, None
+        
     for pet_id in range(5):
         # If battle pets are not full there is no need to sell
         pet = battle_pets[pet_id]
         if pet == None:
-            return "Buy", pet_id, None, 0
+            return None, pet_id, False, None
     
     for pet_id in range(5):
         # If the pet can become an upgrade there is no need to sell
         pet = battle_pets[pet_id]
         if pet.type == shop_pets[best_buy_id].type and pet.level < 3:
-            return "Shop Level", pet_id, None, 0
+            return None, pet_id, True, None
         
     for pet_id_a in range(1, 5):
         # If two existing pets can become upgrades of each other there is no need to sell
@@ -249,11 +246,12 @@ def find_best_pet_move(best_buy_id : int, shop_pets : list[ShopPetInfo], battle_
             if pet_a.type == pet_b.type:
                 if pet_a.level != 3 and pet_b.level != 3:
                     if get_total_sublevels(pet_a) > get_total_sublevels(pet_b):    
-                        return "Board Level and Buy", pet_id_b, pet_id_a, 0
+                        return None, pet_id_b, True, pet_id_a
                     else:
-                        return "Board Level and Buy", pet_id_b, pet_id_a, 0
+                        return None, pet_id_a, True, pet_id_b   
         
     # Otherwise, find lowest value pet
+    worst_pet = None
     worst_pet_id = None
     lowest_value = np.Inf
     for pet_id in range(5):
@@ -261,17 +259,14 @@ def find_best_pet_move(best_buy_id : int, shop_pets : list[ShopPetInfo], battle_
         value = calculate_value(pet, pet_dict)
         if value < lowest_value:
             lowest_value = value
+            worst_pet = pet
             worst_pet_id = pet_id
 
-    return "Sell and Buy", worst_pet_id, None, -lowest_value
+    return worst_pet, worst_pet_id, False, None
 
 # Returns the best target for a food item
     # Currently using trivial calculations based on pet value
-def find_best_food_move(battle_pets : list[PlayerPetInfo], food : ShopFoodInfo, pet_dict : dict[int : PetData], food_dict : dict[int : FoodData]) -> tuple[PlayerPetInfo, int]:
-    food_data = food_dict[food.type.value]
-    if not food_data.is_directed:
-        return None, 0
-    
+def choose_best_food_target(battle_pets : list[PlayerPetInfo], food_data : FoodData, pet_dict : dict[int : PetData], food_dict : dict[int : FoodData]) -> PlayerPetInfo:
     best_target = None
     best_value = np.NINF
     for pet_id in range(5):
@@ -279,42 +274,62 @@ def find_best_food_move(battle_pets : list[PlayerPetInfo], food : ShopFoodInfo, 
         if pet != None:
             value = calculate_value(pet, pet_dict)
             if food_data.is_effect and pet.carried_food != None:
-                # Simplified calculation of value
                 value -= 5 * food_dict[pet.carried_food.value].base_priority
             if value > best_value:
                 best_target = pet
                 best_value = value
+    return best_target
 
-    delta_food_value = count_battle_pets(battle_pets) - 5
-    return best_target, delta_food_value
+# Performs the buy and sell operations
+    # Needs to incorporate food
+def perform_actions(bot_battle : BotBattle, game_info : GameInfo, best_buy_id : int, is_pet : bool, target_space : int, other_space : int, best_sell : ShopPetInfo, is_level_up : bool, pet_dict : dict[int : PetData], food_dict : dict[int : FoodData]):
+    # If there is something to sell, it sells it and refreshes game_info
+    if best_sell != None:
+        print(f"Selling {best_sell.type} at position {target_space}", flush=True)
+        pet_dict[best_sell.type.value].count -= 1
+        bot_battle.sell_pet(best_sell)
+        game_info = bot_battle.get_game_info()
+    
+    
+    battle_pets = game_info.player_info.pets
 
-def buy_pet(bot_battle : BotBattle, best_buy : ShopPetInfo, target_id : int, pet_dict : dict[int : PetData]):
-    print(f"Placing {best_buy.type} at position {target_id}", flush=True)
-    pet_dict[best_buy.type.value].count += 1
-    bot_battle.buy_pet(best_buy, target_id)
+    # Case where a new pet is bought
+    if is_pet:
+        best_buy = game_info.player_info.shop_pets[best_buy_id]
 
-def sell_pet(bot_battle : BotBattle, best_sell : PlayerPetInfo, pet_dict : dict[int : PetData]):
-    print(f"Selling {best_sell.type}", flush=True)
-    pet_dict[best_sell.type.value].count -= 1
-    bot_battle.sell_pet(best_sell)
+        # Case where a level up will occur
+        if is_level_up:
 
-def shop_level(bot_battle : BotBattle, best_buy : ShopPetInfo, target_id : int):
-    print(f"Leveling up {best_buy.type} at position {target_id}", flush=True)
-    bot_battle.level_pet_from_shop(best_buy, game_info.player_info.pets[target_id])
+            # Case where shop pet is used as a level up
+            if other_space == None:
+                print(f"Leveling up {best_buy.type} at position {target_space}", flush=True)
+                bot_battle.level_pet_from_shop(best_buy, game_info.player_info.pets[target_space])
 
-def board_level(bot_battle : BotBattle, battle_pets : list[PlayerPetInfo], target_id : int, other_id : int, pet_dict : dict[int : PetData]):
-    print(f"Leveling up {battle_pets[other_id]} at position {other_id} from position {target_id}", flush=True)
-    bot_battle.level_pet_from_pets(battle_pets[target_id], battle_pets[other_id])
-    pet_dict[battle_pets[target_id].type.value].count -= 1
+            # Case where existing pets are combined
+            else:
+                print(f"Leveling up {battle_pets[other_space]} at position {other_space} from position {target_space}", flush=True)
+                bot_battle.level_pet_from_pets(battle_pets[target_space], battle_pets[other_space])
+                pet_dict[battle_pets[target_space].type.value].count -= 1
+                game_info = bot_battle.get_game_info()
+                best_buy = game_info.player_info.shop_pets[best_buy_id]
 
-def buy_food(bot_battle : BotBattle, best_food : ShopFoodInfo, target : PlayerPetInfo):
-    if target == None:
-        print(f"Giving {best_food.type} to all pets")
-        bot_battle.buy_food(best_food)
+        # Case where the pet is placed on the board normally (including after level up from board)
+        if not is_level_up or other_space != None:
+            print(f"Placing {best_buy.type} at position {target_space}", flush=True)
+            pet_dict[best_buy.type.value].count += 1
+            bot_battle.buy_pet(best_buy, target_space)
+
+    # Case where food is bought
     else:
-        print(f"Giving {best_food.type} to {target.type}")
-        bot_battle.buy_food(best_food, target)
-        
+        best_buy = game_info.player_info.shop_foods[best_buy_id]
+        food_data = food_dict[best_buy.type.value]
+        if food_data.is_directed:
+            target = choose_best_food_target(battle_pets, food_data, pet_dict, food_dict)
+            print(f"Giving {food_data.type} to {target.type}")
+            bot_battle.buy_food(best_buy, target)
+        else:
+            print(f"Giving {food_data.type} to all pets")
+            bot_battle.buy_food(best_buy)
         
 # Generates all permutations of a list "positions"
 def recursive_placement(positions : list[int], depth : int, placement : list[int]) -> list[int]:
@@ -357,15 +372,15 @@ def calculate_placement(battle_pets : list[PlayerPetInfo], pet_dict : dict[int :
 def perform_placement(bot_battle : BotBattle, placement : list[int]):
     # Pets are permuted to get the desired pets in the desired indices
     for i in range(4):
-        if i != placement[i]:
-            bot_battle.swap_pets(i, placement[i])
+        bot_battle.swap_pets(i, placement[i])
 
-            # The placement is updated whenever a swap occurs
-            # The placement list should end up as [0, 1, 2, 3, 4]
-            swap_index = placement.index(i)
-            placement[i], placement[swap_index] = placement[swap_index], placement[i]
+        # The placement is updated whenever a swap occurs
+        # The placement list should end up as [0, 1, 2, 3, 4]
+        swap_index = placement.index(i)
+        placement[i], placement[swap_index] = placement[swap_index], placement[i]
 
-            # Should not get_game_info after the last permutation, since no more actions happen in the loop
+        # Should not get_game_info after the last permutation, since no more actions happen in the loop
+        if i != 3:
             bot_battle.get_game_info()
 
 # Makes a move that may comprise of:
@@ -380,19 +395,25 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     print_shop(shop_pets, shop_foods)
     print_board(battle_pets, pet_dict)
 
-    # Rearranges pets and ends turn if there is not enough coins
+    # Turn ends if there is not enough coins
     if coins < 3:
-        # Finding and performing the ideal placement
-        #   No dynamic calculation currently:
-        #       Not considering attack / health
-        #       Not considering synergy between units
-        placement = calculate_placement(battle_pets, pet_dict)
-        perform_placement(bot_battle, placement)
-        print("Phase completed", flush=True)
-
         return True
 
     """
+    Choices of action are:
+        buy_pet                                     
+        buy_food
+        level_pet_from_shop
+        level_pet_from_pets
+        sell_pet
+        reroll_shop
+        freeze_pet
+        freeze_food
+        unfreeze_pet
+        unfreeze_food
+        swap_pets
+        end_turn
+
     Move flow:
         1. Check the highest "priority" item in both shops
             a. If it can be bought, mark it for purchase
@@ -411,38 +432,27 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     # Need to add reroll
     # Need to account for money aside from end turn 
 
-    best_pet_id, pet_value = find_best_pet(shop_pets, pet_dict)
-    best_food_id, food_value = find_best_food(battle_pets, shop_foods, food_dict)
-    if best_pet_id == None and best_food_id == None:
+    best_buy_id, is_pet = find_best_buy(battle_pets, shop_pets, shop_foods, pet_dict, food_dict)
+    if best_buy_id == None:
         if coins > 0:
             print("Rerolling", flush=True)
             bot_battle.reroll_shop()
             return False
 
-    delta_pet_value = np.NINF
-    delta_food_value = np.NINF
-    if best_pet_id != None:
-        pet_move, target_id, other_id, delta_pet_value = find_best_pet_move(best_pet_id, shop_pets, battle_pets, pet_dict)
-    if best_food_id != None:
-        best_food_target, delta_food_value = find_best_food_move(battle_pets, shop_foods[best_food_id], pet_dict, food_dict)
+    best_sell, free_space, is_level_up, other_space = find_best_sell(best_buy_id, is_pet, shop_pets, battle_pets, pet_dict)
+    perform_actions(bot_battle, game_info, best_buy_id, is_pet, free_space, other_space, best_sell, is_level_up, pet_dict, food_dict)
 
-    if food_value < 0 and pet_value < 0:
-        if coins > 0:
-            bot_battle.reroll_shop()
-    elif food_value + delta_food_value > pet_value + delta_pet_value:
-        buy_food(bot_battle, shop_foods[best_food_id], best_food_target)
-    elif pet_move == "Buy":
-        buy_pet(bot_battle, shop_pets[best_pet_id], target_id, pet_dict)
-    elif pet_move == "Shop Level":
-        shop_level(bot_battle, shop_pets[best_pet_id], target_id)
-    elif pet_move == "Sell and Buy":
-        sell_pet(bot_battle, battle_pets[target_id], pet_dict)
-        game_info = bot_battle.get_game_info()
-        buy_pet(bot_battle, game_info.player_info.shop_pets[best_pet_id], target_id, pet_dict)
-    elif pet_move == "Board Level and Buy":
-        board_level(bot_battle, battle_pets, target_id, other_id, pet_dict)
-        game_info = bot_battle.get_game_info()
-        buy_pet(bot_battle, game_info.player_info.shop_pets[best_pet_id], target_id, pet_dict)
+    # Must refresh game_info after buying
+    game_info = bot_battle.get_game_info()
+    battle_pets = game_info.player_info.pets
+
+    # Finding and performing the ideal placement
+    #   No dynamic calculation currently:
+    #       Not considering attack / health
+    #       Not considering synergy between units
+    placement = calculate_placement(battle_pets, pet_dict)
+    perform_placement(bot_battle, placement)
+    print("Phase completed", flush=True)
 
     # Turn continues
     return False
