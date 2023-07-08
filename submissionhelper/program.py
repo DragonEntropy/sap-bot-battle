@@ -279,7 +279,7 @@ def find_best_food_move(battle_pets : list[PlayerPetInfo], food : ShopFoodInfo, 
             value = calculate_value(pet, pet_dict)
             if food_data.is_effect and pet.carried_food != None:
                 # Simplified calculation of value
-                value -= 5 * food_dict[pet.carried_food.value].base_priority
+                value -= 10 * food_dict[pet.carried_food.value].base_priority
             if value > best_value:
                 best_target = pet
                 best_value = value
@@ -302,7 +302,7 @@ def shop_level(bot_battle : BotBattle, best_buy : ShopPetInfo, target_id : int):
     bot_battle.level_pet_from_shop(best_buy, game_info.player_info.pets[target_id])
 
 def board_level(bot_battle : BotBattle, battle_pets : list[PlayerPetInfo], target_id : int, other_id : int, pet_dict : dict[int : PetData]):
-    print(f"Leveling up {battle_pets[other_id]} at position {other_id} from position {target_id}", flush=True)
+    print(f"Leveling up {battle_pets[other_id].type} at position {other_id} from position {target_id}", flush=True)
     bot_battle.level_pet_from_pets(battle_pets[target_id], battle_pets[other_id])
     pet_dict[battle_pets[target_id].type.value].count -= 1
 
@@ -376,9 +376,11 @@ def perform_placement(bot_battle : BotBattle, placement : list[int]):
 def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int : PetData], food_dict : dict[int : FoodData]) -> bool:
     health, coins, battle_pets, shop_pets, shop_foods = game_info_summary(game_info)
 
+    print(f"Coins: {coins}", flush=True)
+    print(f"Health: {health}", flush=True)
     print_shop(shop_pets, shop_foods)
     print_board(battle_pets, pet_dict)
-
+    
     # Rearranges pets and ends turn if there is not enough coins
     if coins < 3:
         # Finding and performing the ideal placement
@@ -425,9 +427,8 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     if best_food_id != None:
         best_food_target, delta_food_value = find_best_food_move(battle_pets, shop_foods[best_food_id], pet_dict, food_dict)
 
-    if food_value < 0 and pet_value < 0:
-        if coins > 0:
-            bot_battle.reroll_shop()
+    if food_value + delta_food_value < 0 and pet_value + delta_pet_value < 0:
+        bot_battle.reroll_shop()
     elif food_value + delta_food_value > pet_value + delta_pet_value:
         buy_food(bot_battle, shop_foods[best_food_id], best_food_target)
     elif pet_move == "Buy":
@@ -464,7 +465,6 @@ while True:
         phase_num = 1
     
     print(f"\n\nRound {prev_round_num} Phase {phase_num}\n", flush=True)
-    print(f"Coins: {game_info.player_info.coins}", flush=True)
 
     # Ends turn only if all actions are complete
     if make_move(bot_battle, game_info, pet_dict, food_dict):
