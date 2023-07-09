@@ -20,15 +20,32 @@ class PetData:
     base_priority = 0
     count = 0
 
-    def __init__(self, type : PetType, placement_priorities: np.ndarray):
+    # Front is the pet in front of current pet, 
+    # back is the pet behind the current pet.
+
+    # Default is no bonus.
+    default_placement_bonus = lambda back, front: 0
+
+    def __init__(
+            self, type : PetType, placement_priorities: np.ndarray, placement_bonus: callable = None
+        ):
         self.type = type
         self.placement_priorities = placement_priorities
 
+        # placement_bonus is the field that contains the function to calculate the bonus for the placement which can be used to add extra logic to 
+        self.placement_bonus = (
+            PetData.default_placement_bonus if placement_bonus is None 
+                                            else placement_bonus
+        )
+
     # Returns the score of placing the unit a specific index
     @staticmethod
-    def get_placement_score(pet, index : int) -> float:
+    def get_placement_score(
+        pet, index : int, 
+        back: PlayerPetInfo, front: PlayerPetInfo
+    ) -> float:
         if pet:
-            return pet.placement_priorities[index]
+            return pet.placement_priorities[index] + pet.placement_bonus(back, front)
         else:
             return 0
 
@@ -55,6 +72,20 @@ base_pet_priorities = np.array([
     1, 2, 2.5, 3, 2, 2, 0.5, 1.5, 3,    # Tier 3 pets
     3.5, 3, 4, 4, 2, 1                  # Tier 4 pets     
 ])
+
+# Example of adding extra bonus to placement.
+'''
+def elephan_placement_bonus(back: PlayerPetInfo, front: PlayerPetInfo):
+    bonus = 0
+    if (back is not None and back.type != PetType.CAMEL):
+        bonus -= 10
+    elif (back.type == PetType.CAMEL):
+        bonus += 100
+
+elephant = PetData(
+    PetType.ELEPHANT, np.array[0, 0, 0, 0, 0], elephan_placement_bonus
+)
+'''
 
 # Setting up lookup for pet id from the pet id (type.value)
 pet_dict = {
@@ -339,8 +370,26 @@ def calculate_placement(battle_pets : list[PlayerPetInfo], pet_dict : dict[int :
     for placement in recursive_placement(positions, 5, current_placement):
         score = 0
         for pet_id in range(5):
+
+            # Get information about the pet behind and in front.
+
+            # Need confirmation on whether my interpretation of the code is 
+            # correct.
+            front_pet = None
+            back_pet = None
+
+            if (pet_id > 0):
+                front_pet = battle_pets[placement[pet_id - 1]]
+
+            if (pet_id < 4):
+                back_pet = battle_pets[placement[pet_id + 1]]
+
             if battle_pets[placement[pet_id]] != None:
-                score += PetData.get_placement_score(pet_dict[battle_pets[placement[pet_id]].type.value], pet_id)
+                score += PetData.get_placement_score(
+                    pet_dict[battle_pets[placement[pet_id]].type.value], 
+                    pet_id,
+                    back_pet, front_pet
+                )
         
         # Updates when a new best score is found
         if score > best_score:
