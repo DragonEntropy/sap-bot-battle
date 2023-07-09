@@ -161,3 +161,5 @@ cython_debug/
 
 # Customs
 notes.md
+
+testing_environment/
