@@ -160,7 +160,7 @@ pet_dict = {
 }
 
 base_food_priorities = np.array([
-    0.5, 0.75,          # Tier 1 foods
+    0.5, 0.25,          # Tier 1 foods
     1, 0.25,            # Tier 2 foods
     1.5, 2,             # Tier 3 foods
     1.25, 1.75          # Tier 4 foods
@@ -512,7 +512,8 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     if best_food_id != None:
         best_food_target, delta_food_value = find_best_food_move(battle_pets, shop_foods[best_food_id], pet_dict, food_dict)
 
-    if food_value + delta_food_value < 0 and pet_value + delta_pet_value < 0:
+    reroll_priority = (coins % 3) / 2
+    if food_value + delta_food_value <= reroll_priority and pet_value + delta_pet_value <= reroll_priority:
         bot_battle.reroll_shop()
     elif food_value + delta_food_value > pet_value + delta_pet_value:
         buy_food(bot_battle, shop_foods[best_food_id], best_food_target)
