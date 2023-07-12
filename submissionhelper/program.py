@@ -70,7 +70,6 @@ class FoodData:
         self.base_priority = priority
 
 def elephant_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : PetData]):
-    print("Using elephant function", flush=True)
     bonus = 0
     if back == None:
         bonus += 0
@@ -85,7 +84,6 @@ def elephant_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : 
     return bonus
 
 def camel_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : PetData]):
-    print("Using camel function", flush=True)
     bonus = 0
     if back == None:
         bonus -= 20
@@ -96,7 +94,6 @@ def camel_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : Pet
     return bonus
 
 def peacock_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : PetData]):
-    print("Using peacock function", flush=True)
     bonus = 0
     if front == None:
         bonus += 0
@@ -105,7 +102,6 @@ def peacock_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : P
     return bonus
 
 def kangaroo_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : PetData]):
-    print("Using kangaroo function", flush=True)
     bonus = 0
     if front == None:
         bonus -= 10
@@ -117,10 +113,10 @@ def kangaroo_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : 
       
 # Each value corresponds to a pet below
 base_pet_priorities = np.array([
-    1, 0.5, 0, 1, 0.5, 0, 0,            # Tier 1 pets
-    2, 1.5, 0.5, 2, 1, 1.5, 1,          # Tier 2 pets
-    2.5, 1, 2, 0.5, 1.5, 3, 3, 2.5, 2,  # Tier 3 pets
-    2, 4, 3.5, 3, 1, 4                  # Tier 4 pets     
+    1, 0.5, 0, 1, 0.5, 0, 0,                # Tier 1 pets
+    2, 1.5, 0.5, 2, 1, 1.5, 1,              # Tier 2 pets
+    2.5, 1, 2, 0.5, 1.5, 1.5, 3, 3, 2,    # Tier 3 pets
+    2, 4, 3.5, 3, 1, 4                      # Tier 4 pets     
 ])
 
 # Setting up lookup for pet id from the pet id (type.value)
@@ -344,7 +340,7 @@ def find_best_food_move(battle_pets : list[PlayerPetInfo], food : ShopFoodInfo, 
     for pet_id in range(5):
         pet = battle_pets[pet_id]
         if pet != None:
-            value = calculate_value(pet, pet_dict)
+            value = calculate_value(pet, pet_dict) + pet_dict[pet.type.value].base_priority
             if food_data.is_effect and pet.carried_food != None:
                 # Simplified calculation of value
                 value -= 10 * food_dict[pet.carried_food.value].base_priority
@@ -514,6 +510,7 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
 
     reroll_priority = (coins % 3) / 2
     if food_value + delta_food_value <= reroll_priority and pet_value + delta_pet_value <= reroll_priority:
+        print("Rerolling", flush=True)
         bot_battle.reroll_shop()
     elif food_value + delta_food_value > pet_value + delta_pet_value:
         buy_food(bot_battle, shop_foods[best_food_id], best_food_target)
