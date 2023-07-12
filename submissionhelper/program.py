@@ -18,6 +18,7 @@ import numpy as np
 # A helper class for storing data of each pet type
 class PetData:
     base_priority = 0
+    food_priority = 0
     count = 0
 
     # Front is the pet in front of current pet, 
@@ -25,9 +26,10 @@ class PetData:
 
     # Default is no bonus.
     default_placement_bonus = lambda back, front, pet_data: 0
+    default_synergy_bonus = lambda battle_pets: 0
 
     def __init__(
-            self, type : PetType, base_attack : int, base_health : int, placement_priorities: np.ndarray, placement_bonus: callable = None
+            self, type : PetType, base_attack : int, base_health : int, placement_priorities: np.ndarray, placement_bonus: callable = None, synergy_bonus: callable = None
         ):
         self.type = type
         self.placement_priorities = placement_priorities
@@ -41,6 +43,13 @@ class PetData:
         else:
             self.placement_bonus = placement_bonus
             print(f"Placement bonus for {type} set to custom", flush=True)
+
+        if synergy_bonus == None:
+            self.synergy_bonus = PetData.default_synergy_bonus
+            print(f"Synergy bonus for {type} set to default", flush=True)
+        else:
+            self.synergy_bonus = synergy_bonus
+            print(f"Synergy bonus for {type} set to custom", flush=True)
 
     # Returns the score of placing the unit a specific index
     @staticmethod
@@ -56,6 +65,10 @@ class PetData:
     # Sets the base priority    
     def set_priority(self, priority : float):
         self.base_priority = priority
+
+    # Sets the food priority
+    def set_food_priority(self, priority):
+        self.food_priority = priority
 
 class FoodData:
     base_priority = 0
@@ -83,6 +96,19 @@ def elephant_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : 
         bonus -= 10
     return bonus
 
+def elephant_sb(battle_pets : list[PlayerPetInfo]):
+    synergy = 0
+    for pet in battle_pets:
+        if not pet:
+            continue
+        if pet.type == PetType.PEACOCK:
+            synergy = max(synergy, 2)
+        elif pet.type == PetType.BLOWFISH:
+            synergy = max(synergy, 4)
+        elif pet.type == PetType.CAMEL:
+            synergy = max(synergy, 6)
+    return synergy
+
 def camel_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : PetData]):
     bonus = 0
     if back == None:
@@ -90,8 +116,16 @@ def camel_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : Pet
     if front == None:
         bonus += 0
     elif front.type == PetType.ELEPHANT:
-        bonus += 20
+        bonus += 30
     return bonus
+
+def camel_sb(battle_pets : list[PlayerPetInfo]):
+    for pet in battle_pets:
+        if not pet:
+            continue
+        if pet.type == PetType.ELEPHANT:
+            return 6
+    return 0
 
 def peacock_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : PetData]):
     bonus = 0
@@ -100,6 +134,30 @@ def peacock_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : P
     elif front.type == PetType.ELEPHANT:
         bonus += 15
     return bonus
+
+def peacock_sb(battle_pets : list[PlayerPetInfo]):
+    for pet in battle_pets:
+        if not pet:
+            continue
+        if pet.type == PetType.ELEPHANT:
+            return 2
+    return 0
+
+def blowfish_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : PetData]):
+    bonus = 0
+    if front == None:
+        bonus += 0
+    elif front.type == PetType.ELEPHANT:
+        bonus += 20
+    return bonus
+
+def blowfish_sb(battle_pets : list[PlayerPetInfo]):
+    for pet in battle_pets:
+        if not pet:
+            continue
+        if pet.type == PetType.ELEPHANT:
+            return 4
+    return 0
 
 def kangaroo_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : PetData]):
     bonus = 0
@@ -110,13 +168,44 @@ def kangaroo_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : 
             bonus += 10
         bonus += calculate_value(front, pet_dict)
     return bonus
+
+def horse_dog_sb(battle_pets : list[PlayerPetInfo]):
+    synergy = 0
+    for pet in battle_pets:
+        if not pet:
+            continue
+        if pet.type == PetType.SHEEP:
+            synergy += 3
+        elif pet.type == PetType.SPIDER:
+            synergy += 2
+        elif pet.type == PetType.CRICKET:
+            synergy += 1
+    return synergy
+
+def sheep_spider_cricket_sb(battle_pets : list[PlayerPetInfo]):
+    synergy = 0
+    for pet in battle_pets:
+        if not pet:
+            continue
+        if pet.type == PetType.HORSE:
+            synergy += 1
+        elif pet.type == PetType.DOG:
+            synergy += 1
+    return synergy
       
 # Each value corresponds to a pet below
 base_pet_priorities = np.array([
     1, 0.5, 0, 1, 0.5, 0, 0,                # Tier 1 pets
     2, 1.5, 0.5, 2, 1, 1.5, 1,              # Tier 2 pets
-    2.5, 1, 2, 0.5, 1.5, 1.5, 3, 3, 2,    # Tier 3 pets
+    2.5, 1, 2, 0.5, 1.5, 2, 3, 4, 2,        # Tier 3 pets
     2, 4, 3.5, 3, 1, 4                      # Tier 4 pets     
+])
+
+pet_food_priorities = np.array([
+    0, 0, -5, 0, 0, 0, 0,                    # Tier 1 pets
+    0, 0, 0, 10, 0, 6, 0,
+    3, 0, 0, 0, 0, 4, 0, 8, 5,
+    2, 15, 1, 7, 0, 0
 ])
 
 # Setting up lookup for pet id from the pet id (type.value)
@@ -126,31 +215,31 @@ pet_dict = {
     3 : PetData(PetType.PIG, 4, 1, np.array([0.4, 0.2, 0, -0.2, -0.4])),
     4 : PetData(PetType.ANT, 2, 2, np.array([4, 2, 0, -2, -4])),
     5 : PetData(PetType.MOSQUITO, 2, 2, np.array([0, 0, 0, 0, 0])),
-    6 : PetData(PetType.CRICKET, 1, 2, np.array([4, 2, 0, -2, -4])),
-    7 : PetData(PetType.HORSE, 2, 1, np.array([-10, -5, -3, 8, 10])),
+    6 : PetData(PetType.CRICKET, 1, 2, np.array([4, 2, 0, -2, -4]), None, sheep_spider_cricket_sb),
+    7 : PetData(PetType.HORSE, 2, 1, np.array([-10, -5, -3, 8, 10]), None, horse_dog_sb),
 
     8 : PetData(PetType.CRAB, 4, 1, np.array([0, 0, 0, 0, 0])),
     9 : PetData(PetType.SWAN, 1, 2, np.array([0.2, 0.1, 0, -0.1, -0.2])),
     10 : PetData(PetType.HEDGEHOG, 3, 2, np.array([-0.4, -0.2, 0, 0.2, 0.4])),
-    11 : PetData(PetType.PEACOCK, 2, 5, np.array([-2, -1, 0, 1, 2]), peacock_pb),                 # Override when elephant present
+    11 : PetData(PetType.PEACOCK, 2, 5, np.array([-2, -1, 0, 1, 2]), peacock_pb, peacock_sb),                 
     12 : PetData(PetType.FLAMINGO, 3, 2, np.array([6, 6, 6, -8, -10])),
-    13 : PetData(PetType.KANGAROO, 2, 3, np.array([-10, 1, 4, 4, 1]), kangaroo_pb),               # Override when tank / summoner present
-    14 : PetData(PetType.SPIDER, 3, 3, np.array([4, 2, 0, -2, -4])),
+    13 : PetData(PetType.KANGAROO, 2, 3, np.array([-10, 1, 4, 4, 1]), kangaroo_pb),               
+    14 : PetData(PetType.SPIDER, 3, 3, np.array([4, 2, 0, -2, -4]), None, sheep_spider_cricket_sb),
 
-    15 : PetData(PetType.DODO, 4, 2, np.array([-10, 3, 3, 2, 2])),                                # Override when tank present?
+    15 : PetData(PetType.DODO, 4, 2, np.array([-10, 3, 3, 2, 2])),                                
     16 : PetData(PetType.BADGER, 6, 3, np.array([-1, -0.5, -0.5, 0, 2])),
     17 : PetData(PetType.DOLPHIN, 4, 3, np.array([0.4, 0.2, 0, -0.2, -0.4])),
-    18 : PetData(PetType.GIRAFFE, 1, 3, np.array([-8, -4, 0, 6, 6])),                             # Override based on level?
+    18 : PetData(PetType.GIRAFFE, 1, 3, np.array([-8, -4, 0, 6, 6])),                            
     19 : PetData(PetType.BUNNY, 1, 2, np.array([0.2, 0.1, 0, -0.1, -0.2])),
-    20 : PetData(PetType.DOG, 2, 3, np.array([-10, -8, 1, 7, 10])),
-    21 : PetData(PetType.SHEEP, 2, 2, np.array([-10, 4, 4, 2, 0])),
-    22 : PetData(PetType.ELEPHANT, 3, 7, np.array([-4, -3, -2, -1, 10]), elephant_pb),            # Override when peacock / camel / blowfish present
-    23 : PetData(PetType.CAMEL, 2, 4, np.array([1, 3, 3, 3, -10]), camel_pb),                     # Override when elephant present
+    20 : PetData(PetType.DOG, 2, 3, np.array([-10, -8, 1, 7, 10]), None, horse_dog_sb),
+    21 : PetData(PetType.SHEEP, 2, 2, np.array([-10, 4, 4, 2, 0]), None, sheep_spider_cricket_sb),
+    22 : PetData(PetType.ELEPHANT, 3, 7, np.array([-4, -3, -2, -1, 10]), elephant_pb, elephant_sb),            
+    23 : PetData(PetType.CAMEL, 2, 4, np.array([1, 3, 3, 3, -10]), camel_pb, camel_sb),                     
 
     24 : PetData(PetType.SKUNK, 3, 5, np.array([0.2, 0, 0, -0.1, -0.1])),
-    25 : PetData(PetType.HIPPO, 4, 5, np.array([-5, 3, 5, 2, -5])),
+    25 : PetData(PetType.HIPPO, 4, 5, np.array([3, 2, 0, 0, -5])),
     26 : PetData(PetType.BISON, 5, 3, np.array([0, 0, 0, 0, 0])),
-    27 : PetData(PetType.BLOWFISH, 3, 6, np.array([0, 0, 0, 0, 0])),                              # Override when elephant present
+    27 : PetData(PetType.BLOWFISH, 3, 6, np.array([0, 0, 0, 0, 0]), blowfish_pb, blowfish_sb),                              
     28 : PetData(PetType.SQUIRREL, 2, 5, np.array([0.2, 0, 0, -0.1, -0.1])),
     29 : PetData(PetType.PENGUIN, 2, 4, np.array([0.2, 0, 0, -0.1, -0.1])),
 }
@@ -176,6 +265,7 @@ food_dict = {
 # Adding base priorities to pets
 for pet_id in range(29):
     pet_dict[pet_id + 1].set_priority(base_pet_priorities[pet_id])
+    pet_dict[pet_id + 1].set_food_priority(pet_food_priorities[pet_id])
 
 # Adding base priorities to foods
 for food_id in range(8):
@@ -198,7 +288,7 @@ def print_board(battle_pets : list[PlayerPetInfo], pet_dict : dict[int : PetData
         if pet == None:
             print("\tempty")
         else:
-            print(f"\t{pet.type}: {pet.attack}/{pet.health} Level {pet.level}.{pet.sub_level} @ {pet.carried_food} - (Value: {calculate_value(pet, pet_dict)})")
+            print(f"\t{pet.type}: {pet.attack}/{pet.health} Level {pet.level}.{pet.sub_level} @ {pet.carried_food} - (Value: {calculate_value(pet, pet_dict)} + {pet_dict[pet.type.value].synergy_bonus(battle_pets)})")
 
 # Returns the main information from game_info
 def game_info_summary(game_info : GameInfo) -> tuple[int, int, list[PlayerPetInfo], list[ShopFoodInfo], list[ShopFoodInfo]]:
@@ -245,7 +335,7 @@ def find_best_pet(shop_pets : list[ShopPetInfo], battle_pets : list[PlayerPetInf
         for pet_shop_id in range(len(shop_pets)):
             shop_pet = shop_pets[pet_shop_id]
             if pet_dict[pet_id].type == shop_pet.type:
-                priority = pet_dict[pet_id].base_priority
+                priority = pet_dict[pet_id].base_priority + pet_dict[pet_id].synergy_bonus(battle_pets)
                 for battle_pet in battle_pets:
                     if battle_pet != None:
                         if battle_pet.type == shop_pet.type and battle_pet.level < 3:
@@ -321,7 +411,7 @@ def find_best_pet_move(best_buy_id : int, shop_pets : list[ShopPetInfo], battle_
     lowest_value = np.Inf
     for pet_id in range(5):
         pet = battle_pets[pet_id]
-        value = calculate_value(pet, pet_dict)
+        value = calculate_value(pet, pet_dict) + pet_dict[pet.type.value].synergy_bonus(battle_pets)
         if value < lowest_value:
             lowest_value = value
             worst_pet_id = pet_id
@@ -340,7 +430,7 @@ def find_best_food_move(battle_pets : list[PlayerPetInfo], food : ShopFoodInfo, 
     for pet_id in range(5):
         pet = battle_pets[pet_id]
         if pet != None:
-            value = calculate_value(pet, pet_dict) + pet_dict[pet.type.value].base_priority
+            value = pet_dict[pet.type.value].food_priority
             if food_data.is_effect and pet.carried_food != None:
                 # Simplified calculation of value
                 value -= 10 * food_dict[pet.carried_food.value].base_priority
@@ -471,20 +561,14 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     Move flow:
         1. Check the highest "priority" item in both shops
             a. If it can be bought, mark it for purchase
-            b. If it can not be bought, freeze the "n" highest priority items
-            c. If a pet was bought but there was no space, sell lowest "value" pet
+            b. If it can not be bought, freeze the highest priority item
+            c. If a pet was bought but there was no space, sell lowest value pet
             d. If all non-frozen priorities are below reroll, perform reroll (reroll priority is lowest when coins is a multiple of 3)
 
         2. When placing a new pet:
             Calculate total value of all 120 assortments
             Pick highest value assortment and swap pairs
-                    
-        3. If coins is zero and all "n" high priority items are frozen, end turn
     """
-
-    # Need to support freezing
-    # Need to add reroll
-    # Need to account for money aside from end turn 
 
     best_pet_id, pet_value = find_best_pet(shop_pets, battle_pets, pet_dict)
     best_food_id, food_value = find_best_food(battle_pets, shop_foods, food_dict)
