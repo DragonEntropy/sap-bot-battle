@@ -192,13 +192,21 @@ def sheep_spider_cricket_sb(battle_pets : list[PlayerPetInfo]):
         elif pet.type == PetType.DOG:
             synergy += 1
     return synergy
+
+def bison_sb(battle_pets : list[PlayerPetInfo]):
+    for pet in battle_pets:
+        if not pet:
+            continue
+        if pet.level == 3:
+            return 3
+    return 0
       
 # Each value corresponds to a pet below
 base_pet_priorities = np.array([
     1, 0.5, 0, 1, 0.5, 0, 0,                # Tier 1 pets
     2, 1.5, 0.5, 2, 1, 1.5, 1,              # Tier 2 pets
     2.5, 1, 2, 0.5, 1.5, 2, 3, 4, 2,        # Tier 3 pets
-    2, 4, 3.5, 3, 1, 4                      # Tier 4 pets     
+    2, 4, 2, 3, 1, 4                        # Tier 4 pets     
 ])
 
 pet_food_priorities = np.array([
@@ -238,7 +246,7 @@ pet_dict = {
 
     24 : PetData(PetType.SKUNK, 3, 5, np.array([0.2, 0, 0, -0.1, -0.1])),
     25 : PetData(PetType.HIPPO, 4, 5, np.array([3, 2, 0, 0, -5])),
-    26 : PetData(PetType.BISON, 5, 3, np.array([0, 0, 0, 0, 0])),
+    26 : PetData(PetType.BISON, 5, 3, np.array([0, 0, 0, 0, 0]), None, bison_sb),
     27 : PetData(PetType.BLOWFISH, 3, 6, np.array([0, 0, 0, 0, 0]), blowfish_pb, blowfish_sb),                              
     28 : PetData(PetType.SQUIRREL, 2, 5, np.array([0.2, 0, 0, -0.1, -0.1])),
     29 : PetData(PetType.PENGUIN, 2, 4, np.array([0.2, 0, 0, -0.1, -0.1])),
