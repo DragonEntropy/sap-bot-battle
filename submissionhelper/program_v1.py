@@ -20,41 +20,20 @@ class PetData:
     base_priority = 0
     count = 0
 
-    # Front is the pet in front of current pet, 
-    # back is the pet behind the current pet.
-
-    # Default is no bonus.
-    default_placement_bonus = lambda back, front, pet_data: 0
-
-    def __init__(
-            self, type : PetType, base_attack : int, base_health : int, placement_priorities: np.ndarray, placement_bonus: callable = None
-        ):
+    def __init__(self, type : PetType, placement_priorities: np.ndarray):
         self.type = type
         self.placement_priorities = placement_priorities
-        self.base_attack = base_attack
-        self.base_health = base_health
-
-        # placement_bonus is the field that contains the function to calculate the bonus for the placement which can be used to add extra logic to 
-        if placement_bonus == None:
-            self.placement_bonus = PetData.default_placement_bonus
-            print(f"Placement bonus for {type} set to default", flush=True)
-        else:
-            self.placement_bonus = placement_bonus
-            print(f"Placement bonus for {type} set to custom", flush=True)
 
     # Returns the score of placing the unit a specific index
     @staticmethod
-    def get_placement_score(
-        pet, index : int, 
-        back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : "PetData"]
-    ) -> float:
+    def get_placement_score(pet, index : int) -> float:
         if pet:
-            return pet.placement_priorities[index] + pet.placement_bonus(back, front, pet_dict)
+            return pet.placement_priorities[index]
         else:
             return 0
 
     # Sets the base priority    
-    def set_priority(self, priority : float):
+    def set_priority(self, priority):
         self.base_priority = priority
 
 class FoodData:
@@ -68,95 +47,49 @@ class FoodData:
     # Sets the base priority    
     def set_priority(self, priority):
         self.base_priority = priority
-
-def elephant_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : PetData]):
-    print("Using elephant function", flush=True)
-    bonus = 0
-    if back == None:
-        bonus += 0
-    elif back.type == PetType.CAMEL:
-        bonus += 30
-    elif back.type == PetType.BLOWFISH:
-        bonus += 20
-    elif back.type == PetType.PEACOCK:
-        bonus += 15
-    else:
-        bonus -= 10
-    return bonus
-
-def camel_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : PetData]):
-    print("Using camel function", flush=True)
-    bonus = 0
-    if back == None:
-        bonus -= 20
-    if front == None:
-        bonus += 0
-    elif front.type == PetType.ELEPHANT:
-        bonus += 20
-    return bonus
-
-def peacock_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : PetData]):
-    print("Using peacock function", flush=True)
-    bonus = 0
-    if front == None:
-        bonus += 0
-    elif front.type == PetType.ELEPHANT:
-        bonus += 15
-    return bonus
-
-def kangaroo_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : PetData]):
-    print("Using kangaroo function", flush=True)
-    bonus = 0
-    if front == None:
-        bonus -= 10
-    else:
-        if front.type == PetType.CRICKET or front.type == PetType.SPIDER or front.type == PetType.SHEEP:
-            bonus += 10
-        bonus += calculate_value(front, pet_dict)
-    return bonus
-      
+        
 # Each value corresponds to a pet below
 base_pet_priorities = np.array([
     1, 0.5, 0, 1, 0.5, 0, 0,            # Tier 1 pets
-    2, 1.5, 0.5, 2, 1, 1.5, 1,          # Tier 2 pets
-    2.5, 1, 2, 0.5, 1.5, 3, 3, 2.5, 2,  # Tier 3 pets
-    2, 4, 3.5, 3, 1, 4                  # Tier 4 pets     
+    2, 1, 0.5, 1.5, 2, 1, 1.5,          # Tier 2 pets
+    1, 2, 2.5, 3, 2, 2, 0.5, 1.5, 3,    # Tier 3 pets
+    3.5, 3, 4, 4, 2, 1                  # Tier 4 pets     
 ])
 
 # Setting up lookup for pet id from the pet id (type.value)
 pet_dict = {
-    1 : PetData(PetType.FISH, 2, 3, np.array([-0.2, -0.1, 0, 0.1, 0.2])),
-    2 : PetData(PetType.BEAVER, 3, 2, np.array([0.2, 0.1, 0, -0.1, -0.2])),
-    3 : PetData(PetType.PIG, 4, 1, np.array([0.4, 0.2, 0, -0.2, -0.4])),
-    4 : PetData(PetType.ANT, 2, 2, np.array([4, 2, 0, -2, -4])),
-    5 : PetData(PetType.MOSQUITO, 2, 2, np.array([0, 0, 0, 0, 0])),
-    6 : PetData(PetType.CRICKET, 1, 2, np.array([4, 2, 0, -2, -4])),
-    7 : PetData(PetType.HORSE, 2, 1, np.array([-10, -5, -3, 8, 10])),
+    1 : PetData(PetType.FISH, np.array([-0.2, -0.1, 0, 0.1, 0.2])),
+    2 : PetData(PetType.BEAVER, np.array([0.2, 0.1, 0, -0.1, -0.2])),
+    3 : PetData(PetType.PIG, np.array([0.4, 0.2, 0, -0.2, -0.4])),
+    4 : PetData(PetType.ANT, np.array([4, 2, 0, -2, -4])),
+    5 : PetData(PetType.MOSQUITO, np.array([0, 0, 0, 0, 0])),
+    6 : PetData(PetType.CRICKET, np.array([4, 2, 0, -2, -4])),
+    7 : PetData(PetType.HORSE, np.array([-10, -5, -3, 8, 10])),
 
-    8 : PetData(PetType.CRAB, 4, 1, np.array([0, 0, 0, 0, 0])),
-    9 : PetData(PetType.SWAN, 1, 2, np.array([0.2, 0.1, 0, -0.1, -0.2])),
-    10 : PetData(PetType.HEDGEHOG, 3, 2, np.array([-0.4, -0.2, 0, 0.2, 0.4])),
-    11 : PetData(PetType.PEACOCK, 2, 5, np.array([-2, -1, 0, 1, 2]), peacock_pb),                 # Override when elephant present
-    12 : PetData(PetType.FLAMINGO, 3, 2, np.array([6, 6, 6, -8, -10])),
-    13 : PetData(PetType.KANGAROO, 2, 3, np.array([-10, 1, 4, 4, 1]), kangaroo_pb),               # Override when tank / summoner present
-    14 : PetData(PetType.SPIDER, 3, 3, np.array([4, 2, 0, -2, -4])),
+    8 : PetData(PetType.CRAB, np.array([0, 0, 0, 0, 0])),
+    9 : PetData(PetType.FLAMINGO, np.array([6, 6, 6, -8, -10])),
+    10 : PetData(PetType.HEDGEHOG, np.array([-0.4, -0.2, 0, 0.2, 0.4])),
+    11 : PetData(PetType.KANGAROO, np.array([-10, 1, 4, 4, 1])),                # Override when tank / summoner present
+    12 : PetData(PetType.PEACOCK, np.array([-2, -1, 0, 1, 2])),                 # Override when elephant present
+    13 : PetData(PetType.SPIDER, np.array([4, 2, 0, -2, -4])),
+    14 : PetData(PetType.SWAN, np.array([0.2, 0.1, 0, -0.1, -0.2])),
 
-    15 : PetData(PetType.DODO, 4, 2, np.array([-10, 3, 3, 2, 2])),                                # Override when tank present?
-    16 : PetData(PetType.BADGER, 6, 3, np.array([-1, -0.5, -0.5, 0, 2])),
-    17 : PetData(PetType.DOLPHIN, 4, 3, np.array([0.4, 0.2, 0, -0.2, -0.4])),
-    18 : PetData(PetType.GIRAFFE, 1, 3, np.array([-8, -4, 0, 6, 6])),                             # Override based on level?
-    19 : PetData(PetType.BUNNY, 1, 2, np.array([0.2, 0.1, 0, -0.1, -0.2])),
-    20 : PetData(PetType.DOG, 2, 3, np.array([-10, -8, 1, 7, 10])),
-    21 : PetData(PetType.SHEEP, 2, 2, np.array([-10, 4, 4, 2, 0])),
-    22 : PetData(PetType.ELEPHANT, 3, 7, np.array([-4, -3, -2, -1, 10]), elephant_pb),            # Override when peacock / camel / blowfish present
-    23 : PetData(PetType.CAMEL, 2, 4, np.array([1, 3, 3, 3, -10]), camel_pb),                     # Override when elephant present
+    15 : PetData(PetType.BADGER, np.array([-1, -0.5, -0.5, 0, 2])),
+    16 : PetData(PetType.CAMEL, np.array([1, 3, 3, 3, -10])),                   # Override when elephant present
+    17 : PetData(PetType.DODO, np.array([-10, 3, 3, 2, 2])),                    # Override when tank present?
+    18 : PetData(PetType.DOG, np.array([-10, -8, 1, 7, 10])),
+    19 : PetData(PetType.DOLPHIN, np.array([0.4, 0.2, 0, -0.2, -0.4])),
+    20 : PetData(PetType.ELEPHANT, np.array([-4, -3, -2, -1, 10])),             # Override when peacock / camel / blowfish present
+    21 : PetData(PetType.GIRAFFE, np.array([-8, -4, 0, 6, 6])),                 # Override based on level?
+    22 : PetData(PetType.BUNNY, np.array([0.2, 0.1, 0, -0.1, -0.2])),
+    23 : PetData(PetType.SHEEP, np.array([-10, 4, 4, 2, 0])),
 
-    24 : PetData(PetType.SKUNK, 3, 5, np.array([0.2, 0, 0, -0.1, -0.1])),
-    25 : PetData(PetType.HIPPO, 4, 5, np.array([-5, 3, 5, 2, -5])),
-    26 : PetData(PetType.BISON, 5, 3, np.array([0, 0, 0, 0, 0])),
-    27 : PetData(PetType.BLOWFISH, 3, 6, np.array([0, 0, 0, 0, 0])),                              # Override when elephant present
-    28 : PetData(PetType.SQUIRREL, 2, 5, np.array([0.2, 0, 0, -0.1, -0.1])),
-    29 : PetData(PetType.PENGUIN, 2, 4, np.array([0.2, 0, 0, -0.1, -0.1])),
+    24 : PetData(PetType.BISON, np.array([0, 0, 0, 0, 0])),
+    25 : PetData(PetType.BLOWFISH, np.array([0, 0, 0, 0, 0])),                  # Override when elephant present
+    26 : PetData(PetType.HIPPO, np.array([-5, 3, 5, 2, -5])),
+    27 : PetData(PetType.PENGUIN, np.array([0.2, 0, 0, -0.1, -0.1])),
+    28 : PetData(PetType.SKUNK, np.array([0.2, 0, 0, -0.1, -0.1])),
+    29 : PetData(PetType.SQUIRREL, np.array([0.2, 0, 0, -0.1, -0.1])),
 }
 
 base_food_priorities = np.array([
@@ -286,8 +219,7 @@ def find_best_food(battle_pets : list[PlayerPetInfo], shop_foods : list[ShopFood
 # Returns the value of a pet to determine what is best to sell
     # Currently grossly simplified, should be unique lambda function for each pet?
 def calculate_value(pet : PlayerPetInfo, pet_dict : dict[int : PetData]) -> float:
-    pet_data = pet_dict[pet.type.value]
-    return pet_data.base_priority + (pet.attack - pet_data.base_attack) / 4 + (pet.health - pet_data.base_health) / 4
+    return pet_dict[pet.type.value].base_priority + pet.health / 4 + pet.attack / 4
 
 # Returns the best player pet to sell, its index on the board, if an upgrade should be done and another index if upgrading from the board
 # Returns none as best pet to sell if the board is not full or an evolution can take place
@@ -407,26 +339,8 @@ def calculate_placement(battle_pets : list[PlayerPetInfo], pet_dict : dict[int :
     for placement in recursive_placement(positions, 5, current_placement):
         score = 0
         for pet_id in range(5):
-
-            # Get information about the pet behind and in front.
-
-            # Need confirmation on whether my interpretation of the code is 
-            # correct.
-            front_pet = None
-            back_pet = None
-
-            if (pet_id > 0):
-                front_pet = battle_pets[placement[pet_id - 1]]
-
-            if (pet_id < 4):
-                back_pet = battle_pets[placement[pet_id + 1]]
-
             if battle_pets[placement[pet_id]] != None:
-                score += PetData.get_placement_score(
-                    pet_dict[battle_pets[placement[pet_id]].type.value],
-                    pet_id,
-                    back_pet, front_pet, pet_dict
-                )
+                score += PetData.get_placement_score(pet_dict[battle_pets[placement[pet_id]].type.value], pet_id)
         
         # Updates when a new best score is found
         if score > best_score:
@@ -450,6 +364,7 @@ def perform_placement(bot_battle : BotBattle, placement : list[int]):
             swap_index = placement.index(i)
             placement[i], placement[swap_index] = placement[swap_index], placement[i]
 
+            # Should not get_game_info after the last permutation, since no more actions happen in the loop
             bot_battle.get_game_info()
 
 # Makes a move that may comprise of:
