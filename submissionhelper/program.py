@@ -448,6 +448,11 @@ def perform_placement(bot_battle : BotBattle, placement : list[int]):
 
             bot_battle.get_game_info()
 
+def end_turn(bot_battle : BotBattle, battle_pets : list[PlayerPetInfo], pet_dict : dict[int : PetData]):
+    placement = calculate_placement(battle_pets, pet_dict)
+    perform_placement(bot_battle, placement)
+    print("Phase completed", flush=True)
+
 # Makes a move that may comprise of:
     # A buy action
         # A level up action
@@ -461,18 +466,6 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     print(f"Health: {health}", flush=True)
     print_shop(shop_pets, shop_foods)
     print_board(battle_pets, pet_dict)
-    
-    # Rearranges pets and ends turn if there is not enough coins
-    if coins < 3:
-        # Finding and performing the ideal placement
-        #   No dynamic calculation currently:
-        #       Not considering attack / health
-        #       Not considering synergy between units
-        placement = calculate_placement(battle_pets, pet_dict)
-        perform_placement(bot_battle, placement)
-        print("Phase completed", flush=True)
-
-        return True
 
     """
     Move flow:
@@ -508,24 +501,54 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     if best_food_id != None:
         best_food_target, delta_food_value = find_best_food_move(battle_pets, shop_foods[best_food_id], pet_dict, food_dict)
 
+    # Custom reroll priority based on current coin count
     reroll_priority = (coins % 3) / 2
+
+    # Case where nothing should be bought
     if food_value + delta_food_value <= reroll_priority and pet_value + delta_pet_value <= reroll_priority:
-        print("Rerolling", flush=True)
-        bot_battle.reroll_shop()
+        # Rerolls if coins are available
+        if coins > 0:
+            print("Rerolling", flush=True)
+            bot_battle.reroll_shop()
+        # Otherwise ends turn
+        else:
+            end_turn(bot_battle, battle_pets, pet_dict)
+            return True
+
+    # Case where buying the food is the best option
     elif food_value + delta_food_value > pet_value + delta_pet_value:
+        # Freezes the food and ends turn if it can't be bought
+        if coins < 3:
+            print(f"Freezing {shop_foods[best_food_id].type}", flush=True)
+            bot_battle.freeze_food(shop_foods[best_food_id])
+            game_info = bot_battle.get_game_info()
+            end_turn(bot_battle, battle_pets, pet_dict)
+            return True
+        # Otherwise buys the food
         buy_food(bot_battle, shop_foods[best_food_id], best_food_target)
-    elif pet_move == "Buy":
-        buy_pet(bot_battle, shop_pets[best_pet_id], target_id, pet_dict)
-    elif pet_move == "Shop Level":
-        shop_level(bot_battle, shop_pets[best_pet_id], target_id)
-    elif pet_move == "Sell and Buy":
-        sell_pet(bot_battle, battle_pets[target_id], pet_dict)
-        game_info = bot_battle.get_game_info()
-        buy_pet(bot_battle, game_info.player_info.shop_pets[best_pet_id], target_id, pet_dict)
-    elif pet_move == "Board Level and Buy":
-        board_level(bot_battle, battle_pets, target_id, other_id, pet_dict)
-        game_info = bot_battle.get_game_info()
-        buy_pet(bot_battle, game_info.player_info.shop_pets[best_pet_id], target_id, pet_dict)
+
+    # Case where buying the pet is the best option
+    else:
+        # Freezes the pet and ends turn if it can't be bought
+        if coins < 3 and pet_move != "Sell and Buy" or coins < 2 and pet_move == "Sell and Buy":
+            print(f"Freezing {shop_pets[best_pet_id].type}", flush=True)
+            bot_battle.freeze_pet(shop_pets[best_pet_id])
+            game_info = bot_battle.get_game_info()
+            end_turn(bot_battle, battle_pets, pet_dict)
+            return True
+        # Otherwise buys the pet and takes any other required actions
+        if pet_move == "Buy":
+            buy_pet(bot_battle, shop_pets[best_pet_id], target_id, pet_dict)
+        elif pet_move == "Shop Level":
+            shop_level(bot_battle, shop_pets[best_pet_id], target_id)
+        elif pet_move == "Sell and Buy":
+            sell_pet(bot_battle, battle_pets[target_id], pet_dict)
+            game_info = bot_battle.get_game_info()
+            buy_pet(bot_battle, game_info.player_info.shop_pets[best_pet_id], target_id, pet_dict)
+        elif pet_move == "Board Level and Buy":
+            board_level(bot_battle, battle_pets, target_id, other_id, pet_dict)
+            game_info = bot_battle.get_game_info()
+            buy_pet(bot_battle, game_info.player_info.shop_pets[best_pet_id], target_id, pet_dict)
 
     # Turn continues
     return False
@@ -548,6 +571,19 @@ while True:
         phase_num = 1
     
     print(f"\n\nRound {prev_round_num} Phase {phase_num}\n", flush=True)
+
+    # Unfreeze anything frozen from previous round
+    if phase_num == 1:
+        for shop_pet in game_info.player_info.shop_pets:
+            if shop_pet:
+                if shop_pet.is_frozen:
+                    bot_battle.unfreeze_pet(shop_pet)
+                    game_info = bot_battle.get_game_info()
+        for shop_food in game_info.player_info.shop_foods:
+            if shop_food:
+                if shop_food.is_frozen:
+                    bot_battle.unfreeze_food(shop_food)
+                    game_info = bot_battle.get_game_info()
 
     # Ends turn only if all actions are complete
     if make_move(bot_battle, game_info, pet_dict, food_dict):
