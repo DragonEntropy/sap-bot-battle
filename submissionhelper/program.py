@@ -126,7 +126,7 @@ def camel_sb(battle_pets : list[PlayerPetInfo]):
         if not pet:
             continue
         if pet.type == PetType.ELEPHANT:
-            return 6
+            return 3
     return 0
 
 def peacock_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : PetData]):
@@ -158,7 +158,7 @@ def blowfish_sb(battle_pets : list[PlayerPetInfo]):
         if not pet:
             continue
         if pet.type == PetType.ELEPHANT:
-            return 4
+            return 2
     return 0
 
 def kangaroo_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : PetData]):
@@ -207,13 +207,13 @@ def bison_sb(battle_pets : list[PlayerPetInfo]):
 base_pet_priorities = np.array([
     1, 0.5, 0, 1, 0.5, 0, -0.5,             # Tier 1 pets
     2, 0, 0, 2, 0, 1.5, 0,                  # Tier 2 pets
-    0, 0, 0, 0, 3, 0, 0, 4, 3.5,            # Tier 3 pets
+    0, 0, 0, 0, 3, 0, 0, 3, 3.5,            # Tier 3 pets
     2, 4, 1, 3, 1, 4.5                      # Tier 4 pets     
 ])
 
 pet_food_priorities = np.array([
     -5, -5, -5, -10, -5, -5, -5,            # Tier 1 pets
-    0, -5, -5, 5, -5, 6, -5,                # Tier 2 pets    
+    0, -5, -5, 5, -5, 0, -5,                # Tier 2 pets    
     3, -5, -5, -5, -5, -5, -5, 20, 5,       # Tier 3 pets
     2, 15, 1, 7, -5, -5                     # Tier 4 pets
 ])
@@ -452,7 +452,7 @@ def find_best_food_move(battle_pets : list[PlayerPetInfo], food : ShopFoodInfo, 
     for pet_id in range(5):
         pet = battle_pets[pet_id]
         if pet != None:
-            value = pet_dict[pet.type.value].food_priority
+            value = pet_dict[pet.type.value].food_priority + calculate_value(pet, pet_dict)
             if food_data.is_effect and pet.carried_food != None:
                 if buffed_pets == 5:
                     value = np.NINF
