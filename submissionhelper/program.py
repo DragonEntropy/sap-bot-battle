@@ -223,8 +223,8 @@ pet_dict = {
     3 : PetData(PetType.PIG, 4, 1, np.array([0.4, 0.2, 0, -0.2, -0.4])),
     4 : PetData(PetType.ANT, 2, 2, np.array([4, 2, 0, -2, -4])),
     5 : PetData(PetType.MOSQUITO, 2, 2, np.array([0, 0, 0, 0, 0])),
-    6 : PetData(PetType.CRICKET, 1, 2, np.array([4, 2, 0, -2, -4]), None, sheep_spider_cricket_sb),
-    7 : PetData(PetType.HORSE, 2, 1, np.array([-10, -5, -3, 8, 10]), None, horse_dog_sb),
+    6 : PetData(PetType.CRICKET, 1, 2, np.array([4, 2, 0, -2, -4])),
+    7 : PetData(PetType.HORSE, 2, 1, np.array([-10, -5, -3, 8, 10])),
 
     8 : PetData(PetType.CRAB, 4, 1, np.array([0, 0, 0, 0, 0])),
     9 : PetData(PetType.SWAN, 1, 2, np.array([0.2, 0.1, 0, -0.1, -0.2])),
@@ -232,15 +232,15 @@ pet_dict = {
     11 : PetData(PetType.PEACOCK, 2, 5, np.array([-2, -1, 0, 1, 2]), peacock_pb, peacock_sb),                 
     12 : PetData(PetType.FLAMINGO, 3, 2, np.array([6, 6, 6, -8, -10])),
     13 : PetData(PetType.KANGAROO, 2, 3, np.array([-10, 1, 4, 4, 1]), kangaroo_pb),               
-    14 : PetData(PetType.SPIDER, 3, 3, np.array([4, 2, 0, -2, -4]), None, sheep_spider_cricket_sb),
+    14 : PetData(PetType.SPIDER, 3, 3, np.array([4, 2, 0, -2, -4])),
 
     15 : PetData(PetType.DODO, 4, 2, np.array([-10, 3, 3, 2, 2])),                                
     16 : PetData(PetType.BADGER, 6, 3, np.array([-1, -0.5, -0.5, 0, 2])),
     17 : PetData(PetType.DOLPHIN, 4, 3, np.array([0.4, 0.2, 0, -0.2, -0.4])),
     18 : PetData(PetType.GIRAFFE, 1, 3, np.array([-8, -4, 0, 6, 6])),                            
     19 : PetData(PetType.BUNNY, 1, 2, np.array([0.2, 0.1, 0, -0.1, -0.2])),
-    20 : PetData(PetType.DOG, 2, 3, np.array([-10, -8, 1, 7, 10]), None, horse_dog_sb),
-    21 : PetData(PetType.SHEEP, 2, 2, np.array([-10, 4, 4, 2, 0]), None, sheep_spider_cricket_sb),
+    20 : PetData(PetType.DOG, 2, 3, np.array([-10, -8, 1, 7, 10])),
+    21 : PetData(PetType.SHEEP, 2, 2, np.array([-10, 4, 4, 2, 0])),
     22 : PetData(PetType.ELEPHANT, 3, 7, np.array([-4, -3, -2, -1, 10]), elephant_pb, elephant_sb),            
     23 : PetData(PetType.CAMEL, 2, 4, np.array([1, 3, 3, 3, -10]), camel_pb, camel_sb),                     
 
@@ -419,7 +419,7 @@ def find_best_pet_move(best_buy_id : int, shop_pets : list[ShopPetInfo], battle_
     lowest_value = np.Inf
     for pet_id in range(5):
         pet = battle_pets[pet_id]
-        value = calculate_value(pet, pet_dict) + pet_dict[pet.type.value].synergy_bonus(battle_pets)
+        value = calculate_value(pet, pet_dict) + pet_dict[pet.type.value].synergy_bonus(battle_pets) + get_total_sublevels(pet)
         if value < lowest_value:
             lowest_value = value
             worst_pet_id = pet_id
@@ -597,7 +597,7 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
     reroll_priority = (coins % 3) / 2
 
     # Case where nothing should be bought
-    if food_value + delta_food_value <= reroll_priority and pet_value + delta_pet_value <= reroll_priority:
+    if food_value + delta_food_value < reroll_priority and pet_value + delta_pet_value < reroll_priority:
         # Rerolls if coins are available
         if coins > 0:
             print("Rerolling", flush=True)
