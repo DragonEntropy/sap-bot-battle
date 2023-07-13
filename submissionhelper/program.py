@@ -132,7 +132,7 @@ def peacock_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : P
     if front == None:
         bonus += 0
     elif front.type == PetType.ELEPHANT:
-        bonus += 15
+        bonus += 20
     return bonus
 
 def peacock_sb(battle_pets : list[PlayerPetInfo]):
@@ -148,7 +148,7 @@ def blowfish_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : 
     if front == None:
         bonus += 0
     elif front.type == PetType.ELEPHANT:
-        bonus += 20
+        bonus += 15
     return bonus
 
 def blowfish_sb(battle_pets : list[PlayerPetInfo]):
@@ -205,8 +205,8 @@ def bison_sb(battle_pets : list[PlayerPetInfo]):
 base_pet_priorities = np.array([
     1, 0.5, 0, 1, 0.5, 0, 0,                # Tier 1 pets
     2, 1.5, 0.5, 2, 1, 1.5, 1,              # Tier 2 pets
-    2.5, 1, 2, 0.5, 1.5, 2, 3, 4, 2,        # Tier 3 pets
-    2, 4, 5, 3, 1, 4.5                      # Tier 4 pets     
+    2.5, 1, 2, 0.5, 3.5, 2, 3, 4, 2,        # Tier 3 pets
+    2, 4, 2.5, 3, 1, 4.5                    # Tier 4 pets     
 ])
 
 pet_food_priorities = np.array([
@@ -256,7 +256,7 @@ base_food_priorities = np.array([
     0.5, 0.25,          # Tier 1 foods
     0.5, 0.25,          # Tier 2 foods
     1.5, 3,             # Tier 3 foods
-    1.25, 1.75          # Tier 4 foods
+    0.5, 2.5            # Tier 4 foods
 ])
 
 food_dict = {
@@ -381,7 +381,7 @@ def find_best_food(battle_pets : list[PlayerPetInfo], shop_foods : list[ShopFood
     # Currently grossly simplified, should be unique lambda function for each pet?
 def calculate_value(pet : PlayerPetInfo, pet_dict : dict[int : PetData]) -> float:
     pet_data = pet_dict[pet.type.value]
-    return pet_data.base_priority + (pet.attack - pet_data.base_attack) / 4 + (pet.health - pet_data.base_health) / 4
+    return pet_data.base_priority + (pet.attack - pet_data.base_attack) / 2 + (pet.health - pet_data.base_health) / 2
 
 # Returns the best player pet to sell, its index on the board, if an upgrade should be done and another index if upgrading from the board
 # Returns none as best pet to sell if the board is not full or an evolution can take place
@@ -427,7 +427,7 @@ def find_best_pet_move(best_buy_id : int, shop_pets : list[ShopPetInfo], battle_
     lowest_value = np.Inf
     for pet_id in range(5):
         pet = battle_pets[pet_id]
-        value = calculate_value(pet, pet_dict) + pet_dict[pet.type.value].synergy_bonus(battle_pets) + 0.5 * get_total_sublevels(pet)
+        value = calculate_value(pet, pet_dict) + pet_dict[pet.type.value].synergy_bonus(battle_pets) + 0.75 * get_total_sublevels(pet)
         if value < lowest_value:
             lowest_value = value
             worst_pet_id = pet_id
