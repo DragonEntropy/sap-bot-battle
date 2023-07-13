@@ -206,14 +206,14 @@ base_pet_priorities = np.array([
     1, 0.5, 0, 1, 0.5, 0, 0,                # Tier 1 pets
     2, 1.5, 0.5, 2, 1, 1.5, 1,              # Tier 2 pets
     2.5, 1, 2, 0.5, 1.5, 2, 3, 4, 2,        # Tier 3 pets
-    2, 4, 2, 3, 1, 4                        # Tier 4 pets     
+    2, 4, 5, 3, 1, 4.5                      # Tier 4 pets     
 ])
 
 pet_food_priorities = np.array([
-    0, 0, -5, 0, 0, 0, 0,                    # Tier 1 pets
-    0, 0, 0, 10, 0, 6, 0,
-    3, 0, 0, 0, 0, 4, 0, 8, 5,
-    2, 15, 1, 7, 0, 0
+    0, 0, -5, 0, 0, 0, 0,                   # Tier 1 pets
+    0, 0, 0, 10, 0, 6, 0,                   # Tier 2 pets    
+    3, 0, 0, 0, 0, 4, 0, 20, 5,             # Tier 3 pets
+    2, 15, 1, 7, 0, 0                       # Tier 4 pets
 ])
 
 # Setting up lookup for pet id from the pet id (type.value)
@@ -254,8 +254,8 @@ pet_dict = {
 
 base_food_priorities = np.array([
     0.5, 0.25,          # Tier 1 foods
-    1, 0.25,            # Tier 2 foods
-    1.5, 2,             # Tier 3 foods
+    0.5, 0.25,          # Tier 2 foods
+    1.5, 3,             # Tier 3 foods
     1.25, 1.75          # Tier 4 foods
 ])
 
@@ -441,6 +441,8 @@ def find_best_food_move(battle_pets : list[PlayerPetInfo], food : ShopFoodInfo, 
     if not food_data.is_directed:
         return None, 0
     
+    buffed_pets = count_buffed_pets(battle_pets)
+    
     best_target = None
     best_value = np.NINF
     for pet_id in range(5):
@@ -448,6 +450,8 @@ def find_best_food_move(battle_pets : list[PlayerPetInfo], food : ShopFoodInfo, 
         if pet != None:
             value = pet_dict[pet.type.value].food_priority
             if food_data.is_effect and pet.carried_food != None:
+                if buffed_pets == 5:
+                    value = np.NINF
                 # Simplified calculation of value
                 value -= 10 * food_dict[pet.carried_food.value].base_priority
             if value > best_value:
