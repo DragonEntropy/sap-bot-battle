@@ -411,15 +411,19 @@ def find_best_pet_move(best_buy_id : int, shop_pets : list[ShopPetInfo], battle_
                 if pet_a.level != 3 and pet_b.level != 3:
                     if get_total_sublevels(pet_a) > get_total_sublevels(pet_b):    
                         return "Board Level and Buy", pet_id_b, pet_id_a, 0
-                    else:
+                    elif get_total_sublevels(pet_a) < get_total_sublevels(pet_b):
+                        return "Board Level and Buy", pet_id_a, pet_id_b, 0
+                    elif pet_a.carried_food.value > pet_b.carried_food.value:
                         return "Board Level and Buy", pet_id_b, pet_id_a, 0
+                    else:
+                        return "Board Level and Buy", pet_id_a, pet_id_b, 0
         
     # Otherwise, find lowest value pet
     worst_pet_id = None
     lowest_value = np.Inf
     for pet_id in range(5):
         pet = battle_pets[pet_id]
-        value = calculate_value(pet, pet_dict) + pet_dict[pet.type.value].synergy_bonus(battle_pets) + get_total_sublevels(pet)
+        value = calculate_value(pet, pet_dict) + pet_dict[pet.type.value].synergy_bonus(battle_pets) + 0.5 * get_total_sublevels(pet)
         if value < lowest_value:
             lowest_value = value
             worst_pet_id = pet_id
