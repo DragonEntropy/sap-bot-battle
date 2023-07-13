@@ -413,6 +413,10 @@ def find_best_pet_move(best_buy_id : int, shop_pets : list[ShopPetInfo], battle_
                         return "Board Level and Buy", pet_id_b, pet_id_a, 0
                     elif get_total_sublevels(pet_a) < get_total_sublevels(pet_b):
                         return "Board Level and Buy", pet_id_a, pet_id_b, 0
+                    elif not pet_b.carried_food:
+                        return "Board Level and Buy", pet_id_b, pet_id_a, 0
+                    elif not pet_a.carried_food:
+                        return "Board Level and Buy", pet_id_a, pet_id_b, 0
                     elif pet_a.carried_food.value > pet_b.carried_food.value:
                         return "Board Level and Buy", pet_id_b, pet_id_a, 0
                     else:
