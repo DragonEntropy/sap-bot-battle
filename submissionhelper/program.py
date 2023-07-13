@@ -113,6 +113,8 @@ def camel_pb(back: PlayerPetInfo, front: PlayerPetInfo, pet_dict: dict[int : Pet
     bonus = 0
     if back == None:
         bonus -= 20
+    else:
+        bonus += 0.5 * (back.attack + back.health)
     if front == None:
         bonus += 0
     elif front.type == PetType.ELEPHANT:
@@ -198,22 +200,22 @@ def bison_sb(battle_pets : list[PlayerPetInfo]):
         if not pet:
             continue
         if pet.level == 3:
-            return 3
+            return 5
     return 0
       
 # Each value corresponds to a pet below
 base_pet_priorities = np.array([
-    1, 0.5, 0, 1, 0.5, 0, 0,                # Tier 1 pets
+    1, 0.5, 0, 1, 0.5, 0, -0.5,             # Tier 1 pets
     2, 0, 0, 2, 0, 1.5, 0,                  # Tier 2 pets
     0, 0, 0, 0, 3, 0, 0, 4, 3.5,            # Tier 3 pets
-    2, 4, 2.5, 3, 1, 4.5                    # Tier 4 pets     
+    2, 4, 1, 3, 1, 4.5                      # Tier 4 pets     
 ])
 
 pet_food_priorities = np.array([
-    0, 0, -5, 0, 0, 0, 0,                   # Tier 1 pets
-    0, 0, 0, 10, 0, 6, 0,                   # Tier 2 pets    
-    3, 0, 0, 0, 0, 4, 0, 20, 5,             # Tier 3 pets
-    2, 15, 1, 7, 0, 0                       # Tier 4 pets
+    -5, -5, -5, -10, -5, -5, -5,            # Tier 1 pets
+    0, -5, -5, 5, -5, 6, -5,                # Tier 2 pets    
+    3, -5, -5, -5, -5, -5, -5, 20, 5,       # Tier 3 pets
+    2, 15, 1, 7, -5, -5                     # Tier 4 pets
 ])
 
 # Setting up lookup for pet id from the pet id (type.value)
@@ -241,11 +243,11 @@ pet_dict = {
     19 : PetData(PetType.BUNNY, 1, 2, np.array([0.2, 0.1, 0, -0.1, -0.2])),
     20 : PetData(PetType.DOG, 2, 3, np.array([-10, -8, 1, 7, 10])),
     21 : PetData(PetType.SHEEP, 2, 2, np.array([-10, 4, 4, 2, 0])),
-    22 : PetData(PetType.ELEPHANT, 3, 7, np.array([-4, -3, -2, -1, 10]), elephant_pb, elephant_sb),            
-    23 : PetData(PetType.CAMEL, 2, 4, np.array([1, 3, 3, 3, -10]), camel_pb),                     
+    22 : PetData(PetType.ELEPHANT, 3, 7, np.array([0, -2, -3, -5, 10]), elephant_pb, elephant_sb),            
+    23 : PetData(PetType.CAMEL, 2, 4, np.array([1, 3, 3, 3, -10]), camel_pb, camel_sb),                     
 
     24 : PetData(PetType.SKUNK, 3, 5, np.array([0.2, 0, 0, -0.1, -0.1])),
-    25 : PetData(PetType.HIPPO, 4, 5, np.array([3, 2, 0, 0, -5])),
+    25 : PetData(PetType.HIPPO, 4, 5, np.array([0, 0, 0, 0, 0])),
     26 : PetData(PetType.BISON, 5, 3, np.array([0, 0, 0, 0, 0]), None, bison_sb),
     27 : PetData(PetType.BLOWFISH, 3, 6, np.array([0, 0, 0, 0, 0]), blowfish_pb),                              
     28 : PetData(PetType.SQUIRREL, 2, 5, np.array([0.2, 0, 0, -0.1, -0.1])),
@@ -253,7 +255,7 @@ pet_dict = {
 }
 
 base_food_priorities = np.array([
-    0.75, 0,            # Tier 1 foods
+    0.75, -25,          # Tier 1 foods
     0, 0.5,             # Tier 2 foods
     1.5, 3,             # Tier 3 foods
     0, 2.5              # Tier 4 foods
@@ -342,6 +344,8 @@ def find_best_pet(shop_pets : list[ShopPetInfo], battle_pets : list[PlayerPetInf
         # If a pet is in the shop and has the currently highest value, it becomes the best item to buy
         for pet_shop_id in range(len(shop_pets)):
             shop_pet = shop_pets[pet_shop_id]
+            if shop_pet.is_frozen:
+                continue
             if pet_dict[pet_id].type == shop_pet.type:
                 priority = pet_dict[pet_id].base_priority + pet_dict[pet_id].synergy_bonus(battle_pets)
                 for battle_pet in battle_pets:
@@ -637,9 +641,7 @@ def make_move(bot_battle : BotBattle, game_info : GameInfo, pet_dict : dict[int 
         if coins < 3 and pet_move != "Sell and Buy" or coins < 2 and pet_move == "Sell and Buy":
             print(f"Freezing {shop_pets[best_pet_id].type}", flush=True)
             bot_battle.freeze_pet(shop_pets[best_pet_id])
-            game_info = bot_battle.get_game_info()
-            end_turn(bot_battle, battle_pets, pet_dict)
-            return True
+            return False
         # Otherwise buys the pet and takes any other required actions
         if pet_move == "Buy":
             buy_pet(bot_battle, shop_pets[best_pet_id], target_id, pet_dict)
@@ -678,7 +680,8 @@ while True:
 
     # Unfreeze anything frozen from previous round
     if phase_num == 1:
-        for shop_pet in game_info.player_info.shop_pets:
+        for shop_pet_id in range(len(game_info.player_info.shop_pets)):
+            shop_pet = game_info.player_info.shop_pets[shop_pet_id]
             if shop_pet:
                 if shop_pet.is_frozen:
                     bot_battle.unfreeze_pet(shop_pet)
