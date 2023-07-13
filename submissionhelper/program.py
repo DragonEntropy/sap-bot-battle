@@ -204,8 +204,8 @@ def bison_sb(battle_pets : list[PlayerPetInfo]):
 # Each value corresponds to a pet below
 base_pet_priorities = np.array([
     1, 0.5, 0, 1, 0.5, 0, 0,                # Tier 1 pets
-    2, 1.5, 0.5, 2, 1, 1.5, 1,              # Tier 2 pets
-    2.5, 1, 2, 0.5, 3.5, 2, 3, 4, 2,        # Tier 3 pets
+    2, 0, 0, 2, 0, 1.5, 0,                  # Tier 2 pets
+    0, 0, 0, 0, 3, 0, 0, 4, 3.5,            # Tier 3 pets
     2, 4, 2.5, 3, 1, 4.5                    # Tier 4 pets     
 ])
 
@@ -229,7 +229,7 @@ pet_dict = {
     8 : PetData(PetType.CRAB, 4, 1, np.array([0, 0, 0, 0, 0])),
     9 : PetData(PetType.SWAN, 1, 2, np.array([0.2, 0.1, 0, -0.1, -0.2])),
     10 : PetData(PetType.HEDGEHOG, 3, 2, np.array([-0.4, -0.2, 0, 0.2, 0.4])),
-    11 : PetData(PetType.PEACOCK, 2, 5, np.array([-2, -1, 0, 1, 2]), peacock_pb, peacock_sb),                 
+    11 : PetData(PetType.PEACOCK, 2, 5, np.array([-2, -1, 0, 1, 2]), peacock_pb),                 
     12 : PetData(PetType.FLAMINGO, 3, 2, np.array([6, 6, 6, -8, -10])),
     13 : PetData(PetType.KANGAROO, 2, 3, np.array([-10, 1, 4, 4, 1]), kangaroo_pb),               
     14 : PetData(PetType.SPIDER, 3, 3, np.array([4, 2, 0, -2, -4])),
@@ -242,21 +242,21 @@ pet_dict = {
     20 : PetData(PetType.DOG, 2, 3, np.array([-10, -8, 1, 7, 10])),
     21 : PetData(PetType.SHEEP, 2, 2, np.array([-10, 4, 4, 2, 0])),
     22 : PetData(PetType.ELEPHANT, 3, 7, np.array([-4, -3, -2, -1, 10]), elephant_pb, elephant_sb),            
-    23 : PetData(PetType.CAMEL, 2, 4, np.array([1, 3, 3, 3, -10]), camel_pb, camel_sb),                     
+    23 : PetData(PetType.CAMEL, 2, 4, np.array([1, 3, 3, 3, -10]), camel_pb),                     
 
     24 : PetData(PetType.SKUNK, 3, 5, np.array([0.2, 0, 0, -0.1, -0.1])),
     25 : PetData(PetType.HIPPO, 4, 5, np.array([3, 2, 0, 0, -5])),
     26 : PetData(PetType.BISON, 5, 3, np.array([0, 0, 0, 0, 0]), None, bison_sb),
-    27 : PetData(PetType.BLOWFISH, 3, 6, np.array([0, 0, 0, 0, 0]), blowfish_pb, blowfish_sb),                              
+    27 : PetData(PetType.BLOWFISH, 3, 6, np.array([0, 0, 0, 0, 0]), blowfish_pb),                              
     28 : PetData(PetType.SQUIRREL, 2, 5, np.array([0.2, 0, 0, -0.1, -0.1])),
     29 : PetData(PetType.PENGUIN, 2, 4, np.array([0.2, 0, 0, -0.1, -0.1])),
 }
 
 base_food_priorities = np.array([
-    0.5, 0.25,          # Tier 1 foods
-    0.5, 0.25,          # Tier 2 foods
+    0.75, 0,            # Tier 1 foods
+    0, 0.5,             # Tier 2 foods
     1.5, 3,             # Tier 3 foods
-    0.5, 2.5            # Tier 4 foods
+    0, 2.5              # Tier 4 foods
 ])
 
 food_dict = {
@@ -381,7 +381,7 @@ def find_best_food(battle_pets : list[PlayerPetInfo], shop_foods : list[ShopFood
     # Currently grossly simplified, should be unique lambda function for each pet?
 def calculate_value(pet : PlayerPetInfo, pet_dict : dict[int : PetData]) -> float:
     pet_data = pet_dict[pet.type.value]
-    return pet_data.base_priority + (pet.attack - pet_data.base_attack) / 2 + (pet.health - pet_data.base_health) / 2
+    return pet_data.base_priority + (pet.attack - pet_data.base_attack) / 4 + (pet.health - pet_data.base_health) / 4
 
 # Returns the best player pet to sell, its index on the board, if an upgrade should be done and another index if upgrading from the board
 # Returns none as best pet to sell if the board is not full or an evolution can take place
@@ -427,7 +427,7 @@ def find_best_pet_move(best_buy_id : int, shop_pets : list[ShopPetInfo], battle_
     lowest_value = np.Inf
     for pet_id in range(5):
         pet = battle_pets[pet_id]
-        value = calculate_value(pet, pet_dict) + pet_dict[pet.type.value].synergy_bonus(battle_pets) + 0.75 * get_total_sublevels(pet)
+        value = calculate_value(pet, pet_dict) + pet_dict[pet.type.value].synergy_bonus(battle_pets) + 0.5 * get_total_sublevels(pet)
         if value < lowest_value:
             lowest_value = value
             worst_pet_id = pet_id
